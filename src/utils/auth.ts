@@ -15,6 +15,23 @@ export const auth = betterAuth({
         schema: schema,
     }),
 
+    user: {
+        additionalFields: {
+            birthdate: {
+                type: "string",
+                required: false,
+            },
+            nin: {
+                type: "string",
+                required: false,
+            },
+            mitidUuid: {
+                type: "string",
+                required: false,
+            },
+        },
+    },
+
     plugins: [
         admin(),
         genericOAuth({
@@ -32,20 +49,21 @@ export const auth = betterAuth({
                         "mitid-extra",
                     ],
                     mapProfileToUser: (profile) => {
-                        console.log("SIGNICAT PROFILE:");
-                        console.dir(profile, { depth: null });
-
                         return {
                             name: profile.name ??
                                 `${profile.given_name ?? ""} ${profile.family_name ?? ""}`.trim(),
 
                             email:
                                 profile.email ??
-                                `${profile.sub}@mitid.invalid`,
+                                `${profile.mitid_uuid}@mitid.invalid`,
+                            
+                            birthdate: profile.birthdate ?? null,
+                            nin: profile.nin ?? null,
+                            mitidUuid: profile.mitid_uuid ?? null,
                         };
                     },
                 },
-                // Add more providers as needed
+
             ]
         })
     ],
