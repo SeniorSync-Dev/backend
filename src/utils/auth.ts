@@ -40,8 +40,7 @@ export const auth = betterAuth({
                     providerId: "mitid",
                     clientId: process.env.MITID_CLIENT_ID!,
                     clientSecret: process.env.MITID_CLIENT_SECRET!,
-                    discoveryUrl:
-                        "https://seniorsync.sandbox.signicat.com/auth/open/.well-known/openid-configuration",
+                    discoveryUrl: process.env.MITID_DISCOVERY_URL!,
                     scopes: [
                         "openid",
                         "profile",

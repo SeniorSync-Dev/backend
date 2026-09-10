@@ -6,6 +6,7 @@ const requiredSecrets = [
     "BETTER_AUTH_URL",
     "MITID_CLIENT_ID",
     "MITID_CLIENT_SECRET",
+    "MITID_DISCOVERY_URL",
 ] as const;
 
 export async function loadDopplerSecrets(): Promise<void> {
