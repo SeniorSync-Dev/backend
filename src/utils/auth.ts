@@ -2,7 +2,9 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import * as schema from "../db/schemas";
 import dbClient from "../db/dbClient";
-import { admin, genericOAuth } from "better-auth/plugins";
+import { admin as adminPlugin, genericOAuth } from "better-auth/plugins";
+import {createAuthMiddleware, getOAuthState} from "better-auth/api";
+import { ac, admin, relative, citizen, employee } from "./accessController";
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
@@ -33,7 +35,17 @@ export const auth = betterAuth({
     },
 
     plugins: [
-        admin(),
+        adminPlugin({
+            ac,
+            adminRole: admin,
+            defaultRole: "relative",
+            roles: {
+                relative: relative,
+                citizen: citizen,
+                employee: employee,
+                admin: admin,
+            },
+        }),
         genericOAuth({
             config: [
                 {
@@ -67,6 +79,71 @@ export const auth = betterAuth({
             ],
         }),
     ],
+
+    hooks: {
+        after: createAuthMiddleware(async (ctx) => {
+            console.log("Request path:", ctx.path);
+            // Only run this hook for the MitID callback route
+            if (ctx.path !== "/callback/:id") {
+                return;
+            }
+
+            // Get the OAuth state from the request, which contains the account type
+            const oauthState = await getOAuthState<{
+                accountype: "citizen" | "relative";
+            }>();
+
+            const accountType = oauthState?.accountType;
+            console.log("Account type from OAuth state:", accountType);
+            if (!accountType) {
+                return;
+            }
+
+            const allowedAccountTypes = [
+                "citizen",
+                "relative",
+            ] as const;
+
+            if (!allowedAccountTypes.includes(accountType)) {
+                console.error(`Invalid account type: ${accountType}`);
+                throw new Error(`Invalid account type: ${accountType}`);
+            }
+
+            const session = ctx.context.newSession;
+
+            if (!session?.user) {
+                return;
+            }
+
+            const userId = session.user.id;
+
+            switch (accountType) {
+                case "citizen": {
+                    await dbClient
+                        .insert(schema.citizen)
+                        .values({
+                            userId,
+                        })
+                        .onConflictDoNothing();
+                    //TODO - Set the role to "citizen" for the user
+                    break;
+                }
+
+                case "relative": {
+                    await dbClient
+                        .insert(schema.relative)
+                        .values({
+                            userId,
+                        })
+                        .onConflictDoNothing();
+                    // TODO - Set the role to "relative" for the user
+                    break;
+                }
+            }
+        })
+
+
+    },
 
     trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
 });
