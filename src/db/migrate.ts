@@ -7,5 +7,5 @@ const migration = Bun.spawn(["bunx", "drizzle-kit", "migrate"], {
     stdout: "inherit",
     stderr: "inherit",
 });
-
+ 
 process.exit(await migration.exited);

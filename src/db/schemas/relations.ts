@@ -1,11 +1,7 @@
 import { defineRelations } from "drizzle-orm";
 import { user, session, account, verification } from "./auth-schema";
-import {
-  relative,
-  citizen,
-  employee,
-  relativeCitizen,
-} from "./subUser-schema";
+import {relative, citizen, employee, relativeCitizen} from "./subUser-schema";
+import { facillity, employeeFacilities, address } from "./facillity-schema";
 
 export const relations = defineRelations(
   {
@@ -17,6 +13,9 @@ export const relations = defineRelations(
     citizen,
     employee,
     relativeCitizen,
+    facillity,
+    employeeFacilities,
+    address,
   },
   (r) => ({
     user: {
@@ -83,6 +82,10 @@ export const relations = defineRelations(
         to: r.user.id,
         optional: false,
       }),
+      facilities: r.many.facillity({
+        from: r.employee.userId.through(r.employeeFacilities.employeeUserId),
+        to: r.facillity.id.through(r.employeeFacilities.facilityId),
+      }),
     },
     relativeCitizen: {
       relative: r.one.relative({
@@ -93,6 +96,17 @@ export const relations = defineRelations(
       citizen: r.one.citizen({
         from: r.relativeCitizen.citizenUserId,
         to: r.citizen.userId,
+        optional: false,
+      }),
+    },
+    facility: {
+      employees: r.many.employee({
+        from: r.facillity.id.through(r.employeeFacilities.facilityId),
+        to: r.employee.userId.through(r.employeeFacilities.employeeUserId),
+      }),
+      address: r.one.address({
+        from: r.facillity.addressId,
+        to: r.address.id,
         optional: false,
       }),
     },
