@@ -3,7 +3,8 @@
     "scripts": {
         "dev": "bun run --hot src/index.ts",
         "start": "bun run src/index.ts",
-        "db:migrate": "bun run src/db/migrate.ts"
+        "db:migrate": "bun run src/db/customSpawners/migrate.ts",
+        "db:generate": "bun run src/db/customSpawners/generate.ts"
     },
     "dependencies": {
         "@dopplerhq/node-sdk": "^1.3.0",

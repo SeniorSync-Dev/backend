@@ -6,14 +6,15 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { encryptedText } from "../../utils/cryptoService";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   birthdate: text("birthdate"),
-  nin: text("nin"),
-  mitidUuid: text("mitid_uuid"),
+  nin: encryptedText("nin"),
+  mitidUuid: encryptedText("mitid_uuid"),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -4,6 +4,7 @@ const requiredSecrets = [
     "DATABASE_URL",
     "BETTER_AUTH_SECRET",
     "BETTER_AUTH_URL",
+    "ENCRYPTION_KEY",
     "MITID_CLIENT_ID",
     "MITID_CLIENT_SECRET",
     "MITID_DISCOVERY_URL",
