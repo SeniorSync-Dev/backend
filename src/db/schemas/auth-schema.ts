@@ -90,7 +90,7 @@ export const verification = pgTable(
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at")
             .defaultNow()
-            .$onUpdate(() => /* @__PURE__ */ new Date())
+            .$onUpdate(() => new Date())
             .notNull(),
     },
     (table) => [index("verification_identifier_idx").on(table.identifier)],
