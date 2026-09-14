@@ -1,6 +1,7 @@
 import {
     createCipheriv,
     createDecipheriv,
+    createHmac,
     randomBytes,
 } from "node:crypto";
 import { customType } from "drizzle-orm/pg-core";
@@ -16,7 +17,9 @@ if (!encryptionKey) {
 const key = Buffer.from(encryptionKey, "base64");
 
 if (key.length !== 32) {
-    console.error(`ENCRYPTION_KEY must be exactly 32 bytes, but got ${key.length} bytes`);
+    console.error(
+        `ENCRYPTION_KEY must be exactly 32 bytes, but got ${key.length} bytes`,
+    );
     throw new Error("ENCRYPTION_KEY must be exactly 32 bytes");
 }
 
@@ -56,6 +59,11 @@ export function decrypt(value: string): string {
     ]);
 
     return decrypted.toString("utf8");
+}
+
+// Deterministic (not reversible) - used to look up a nin without decrypting every row
+export function hashNin(value: string): string {
+    return createHmac("sha256", key).update(value, "utf8").digest("hex");
 }
 
 export const encryptedText = customType<{
