@@ -10,7 +10,6 @@ app.use(
         origin: [
             "http://localhost:3001",
             "http://localhost:3000",
-            "https://app.recuro.dk",
         ],
         allowHeaders: ["Content-Type", "Authorization"],
         allowMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE"],
