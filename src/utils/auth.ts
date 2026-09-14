@@ -5,6 +5,7 @@ import dbClient from "../db/dbClient";
 import { admin as adminPlugin, genericOAuth } from "better-auth/plugins";
 import {createAuthMiddleware, getOAuthState} from "better-auth/api";
 import { ac, admin, relative, citizen, employee } from "./accessController";
+import { audit } from "./auditLogger";
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
@@ -116,6 +117,14 @@ export const auth = betterAuth({
             }
 
             const userId = session.user.id;
+
+            await audit({
+                actorId: userId,
+                action: "auth.signIn",
+                details: { provider: "mitid" },
+                ip: ctx.headers?.get("x-forwarded-for") ?? undefined,
+                userAgent: ctx.headers?.get("user-agent") ?? undefined,
+            });
 
             switch (accountType) {
                 case "citizen": {
