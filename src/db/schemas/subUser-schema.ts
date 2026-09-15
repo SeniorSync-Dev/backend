@@ -61,7 +61,6 @@ export const employee = pgTable("employee", {
     userId: text("user_id")
         .unique()
         .references(() => user.id, { onDelete: "cascade" }),
-    ninHash: text("nin_hash").notNull().unique(),
     addressId: uuid("address_id").references(() => address.id),
     employeeNumber: text("employee_number").notNull().unique(),
     jobTitle: text("job_title").notNull(),

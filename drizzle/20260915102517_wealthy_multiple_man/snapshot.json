@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "7415c3ae-1835-47c4-91e3-68f36cb7e5ed",
+  "id": "0172ceec-5341-45b4-b9af-42c4c23613ce",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -1069,19 +1069,6 @@
       "default": null,
       "generated": null,
       "identity": null,
-      "name": "nin_hash",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "user"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": false,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
       "name": "mitid_uuid",
       "entityType": "columns",
       "schema": "public",
@@ -1291,19 +1278,6 @@
       "generated": null,
       "identity": null,
       "name": "user_id",
-      "entityType": "columns",
-      "schema": "public",
-      "table": "employee"
-    },
-    {
-      "type": "text",
-      "typeSchema": null,
-      "notNull": true,
-      "dimensions": 0,
-      "default": null,
-      "generated": null,
-      "identity": null,
-      "name": "nin_hash",
       "entityType": "columns",
       "schema": "public",
       "table": "employee"
@@ -4875,17 +4849,6 @@
       ],
       "nullsNotDistinct": false,
       "name": "employee_user_id_key",
-      "schema": "public",
-      "table": "employee",
-      "entityType": "uniques"
-    },
-    {
-      "nameExplicit": false,
-      "columns": [
-        "nin_hash"
-      ],
-      "nullsNotDistinct": false,
-      "name": "employee_nin_hash_key",
       "schema": "public",
       "table": "employee",
       "entityType": "uniques"

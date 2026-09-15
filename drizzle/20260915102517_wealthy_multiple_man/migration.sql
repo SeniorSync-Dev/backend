@@ -84,7 +84,6 @@ CREATE TABLE "user" (
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	"birthdate" text,
 	"nin" text,
-	"nin_hash" text,
 	"mitid_uuid" text
 );
 --> statement-breakpoint
@@ -111,7 +110,6 @@ CREATE TABLE "citizen" (
 CREATE TABLE "employee" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 	"user_id" text UNIQUE,
-	"nin_hash" text NOT NULL UNIQUE,
 	"address_id" uuid,
 	"employee_number" text NOT NULL UNIQUE,
 	"job_title" text NOT NULL,

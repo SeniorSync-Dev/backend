@@ -3,10 +3,8 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "../db/schemas";
 import { dbClient} from "../db/dbClient";
 import { organization, genericOAuth } from "better-auth/plugins";
-import { createAuthMiddleware, getOAuthState } from "better-auth/api";
 import { ac, systemAdmin, relative, citizen, employee } from "./accessController";
 import { hashNin } from "./cryptoService";
-import { and, eq, isNull } from "drizzle-orm";
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
@@ -26,10 +24,6 @@ export const auth = betterAuth({
                 required: false,
             },
             nin: {
-                type: "string",
-                required: false,
-            },
-            ninHash: {
                 type: "string",
                 required: false,
             },
@@ -78,7 +72,6 @@ export const auth = betterAuth({
 
                             birthdate: profile.birthdate ?? null,
                             nin,
-                            ninHash: nin ? hashNin(nin) : null,
                             mitidUuid: profile.mitid_uuid ?? null,
                         };
                     },
