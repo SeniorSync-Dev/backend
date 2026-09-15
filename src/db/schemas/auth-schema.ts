@@ -1,4 +1,5 @@
 import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { encryptedText } from "../../utils/cryptoService";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -12,9 +13,8 @@ export const user = pgTable("user", {
     .$onUpdate(() => /* @__PURE__ */ new Date())
     .notNull(),
   birthdate: text("birthdate"),
-  nin: text("nin"),
-  ninHash: text("nin_hash"),
-  mitidUuid: text("mitid_uuid"),
+  nin: encryptedText("nin"),
+  mitidUuid: encryptedText("mitid_uuid"),
 });
 
 export const session = pgTable(
