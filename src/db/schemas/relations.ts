@@ -1,5 +1,13 @@
 import { defineRelations } from "drizzle-orm";
-import { user, session, account, verification } from "./auth-schema";
+import {
+    user,
+    session,
+    account,
+    verification,
+    organization,
+    member,
+    invitation,
+} from "./auth-schema";
 import { relative, citizen, employee, relativeCitizen } from "./subUser-schema";
 import {
     facillity,
@@ -32,6 +40,9 @@ export const relations = defineRelations(
         session,
         account,
         verification,
+        organization,
+        member,
+        invitation,
         relative,
         citizen,
         employee,
@@ -103,6 +114,40 @@ export const relations = defineRelations(
         account: {
             user: r.one.user({
                 from: r.account.userId,
+                to: r.user.id,
+                optional: false,
+            }),
+        },
+        organization: {
+            members: r.many.member({
+                from: r.organization.id,
+                to: r.member.organizationId,
+            }),
+            invitations: r.many.invitation({
+                from: r.organization.id,
+                to: r.invitation.organizationId,
+            }),
+        },
+        member: {
+            organization: r.one.organization({
+                from: r.member.organizationId,
+                to: r.organization.id,
+                optional: false,
+            }),
+            user: r.one.user({
+                from: r.member.userId,
+                to: r.user.id,
+                optional: false,
+            }),
+        },
+        invitation: {
+            organization: r.one.organization({
+                from: r.invitation.organizationId,
+                to: r.organization.id,
+                optional: false,
+            }),
+            inviter: r.one.user({
+                from: r.invitation.inviterId,
                 to: r.user.id,
                 optional: false,
             }),

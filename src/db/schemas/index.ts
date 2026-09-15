@@ -5,4 +5,3 @@ export * from "./activity-schema";
 export * from "./care-task-schema";
 export * from "./medication-schema";
 export * from "./sensor-schema";
-export * from "./relations";
