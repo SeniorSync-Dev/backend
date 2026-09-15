@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./utils/auth";
-import { adminUsersRoute } from "./routes/adminUsers";
 
 const app = new Hono();
 
@@ -18,7 +17,6 @@ app.use(
 );
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
-app.route("/api/admin", adminUsersRoute);
 
 app.get("/", (c) => c.text("Hello Hono!"));
 
