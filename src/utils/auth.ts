@@ -154,7 +154,18 @@ export const auth = betterAuth({
                             userId,
                         })
                         .onConflictDoNothing();
-                    //TODO - Set the role to "citizen" for the user
+                    const headers = ctx.headers ?? ctx.request?.headers;
+                    if (!headers) {
+                        return;
+                    }
+
+                    await auth.api.setRole({
+                        body: {
+                            userId,
+                            role: "citizen",
+                        },
+                        headers,
+                    });
                     break;
                 }
 
@@ -165,7 +176,18 @@ export const auth = betterAuth({
                             userId,
                         })
                         .onConflictDoNothing();
-                    // TODO - Set the role to "relative" for the user
+                    const headers = ctx.headers ?? ctx.request?.headers;
+                    if (!headers) {
+                        return;
+                    }
+
+                    await auth.api.setRole({
+                        body: {
+                            userId,
+                            role: "relative",
+                        },
+                        headers,
+                    });
                     break;
                 }
             }
