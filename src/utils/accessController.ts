@@ -1,4 +1,3 @@
-import { organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 
 export const statement = {
