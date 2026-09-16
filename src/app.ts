@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./utils/auth";
-import citizenRoutes from "./routes/citizen";
+import citizenRoutes from "./routes/citizenRoutes/citizen";
 
 const app = new Hono();
 
@@ -24,7 +24,7 @@ app.onError((error, c) => {
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
-app.route("/api/citizen", citizenRoutes);
+app.route("/citizen", citizenRoutes);
 
 app.get("/", (c) => c.text("Hello Hono!"));
 

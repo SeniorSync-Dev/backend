@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { and, asc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
-import { dbClient } from "../db/dbClient";
+import { dbClient } from "../../db/dbClient";
 import {
     activity,
     activitySignup,
@@ -9,35 +9,13 @@ import {
     employee,
     facillity,
     user,
-} from "../db/schemas";
+} from "../../db/schemas";
 import {
     requireSession,
     type SessionVariables,
-} from "../middleware/require-session";
-
-
-type AppointmentType = "screen_visit" | "home_visit" | "activity";
-
-interface AppointmentDto {
-    id: string;
-    type: AppointmentType;
-    title: string;
-    description?: string;
-    start: string;
-    end?: string;
-    location?: string;
-    staffName?: string;
-}
-
-interface ActivityDto {
-    id: string;
-    title: string;
-    start: string;
-    end?: string;
-    location?: string;
-    availableSpots?: number;
-    isSignedUp: boolean;
-}
+} from "../../middleware/require-session";
+import { AppointmentModel } from "../../models/appointment";
+import { ActivityModel } from "../../models/activity";
 
 const UUID_PATTERN =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -98,9 +76,9 @@ citizenRoutes.get("/appointments", async (c) => {
             ),
         );
 
-    const appointments: AppointmentDto[] = [
+    const appointments: AppointmentModel[] = [
         ...tasks.map(
-            (task): AppointmentDto => ({
+            (task): AppointmentModel => ({
                 id: task.id,
                 type: task.type === "call" ? "screen_visit" : "home_visit",
                 title: task.title,
@@ -112,7 +90,7 @@ citizenRoutes.get("/appointments", async (c) => {
             }),
         ),
         ...signups.map(
-            (signup): AppointmentDto => ({
+            (signup): AppointmentModel => ({
                 id: signup.id,
                 type: "activity",
                 title: signup.title,
@@ -265,7 +243,7 @@ async function visibleActivities(citizenUserId: string, activityId?: string) {
 
 type VisibleActivity = Awaited<ReturnType<typeof visibleActivities>>[number];
 
-function toActivityDto(row: VisibleActivity): ActivityDto {
+function toActivityDto(row: VisibleActivity): ActivityModel {
     return {
         id: row.id,
         title: row.title,
