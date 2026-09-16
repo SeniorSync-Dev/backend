@@ -3,6 +3,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "../db/schemas";
 import { dbClient } from "../db/dbClient";
 import { organization, genericOAuth } from "better-auth/plugins";
+import getInitialOrganizationAsync from "./helpers/organizationHelper";
 import {
     ac,
     systemAdmin,
@@ -10,7 +11,6 @@ import {
     citizen,
     employee,
 } from "./accessController";
-import { hashNin } from "./cryptoService";
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
@@ -97,6 +97,22 @@ export const auth = betterAuth({
             ],
         }),
     ],
+
+    databaseHooks: {
+    session: {
+      create: {
+        before: async (session) => {
+          const organization = await getInitialOrganizationAsync(session.userId);
+          return {
+            data: {
+              ...session,
+              activeOrganizationId: organization?.id,
+            },
+          };
+        },
+      },
+    },
+  },
 
     trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
 });

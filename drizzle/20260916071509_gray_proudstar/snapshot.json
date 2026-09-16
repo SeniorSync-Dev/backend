@@ -1,7 +1,7 @@
 {
   "version": "8",
   "dialect": "postgres",
-  "id": "0172ceec-5341-45b4-b9af-42c4c23613ce",
+  "id": "86bce79c-7885-4357-9151-ba43d864d539",
   "prevIds": [
     "00000000-0000-0000-0000-000000000000"
   ],
@@ -537,6 +537,19 @@
       "generated": null,
       "identity": null,
       "name": "scope",
+      "entityType": "columns",
+      "schema": "public",
+      "table": "account"
+    },
+    {
+      "type": "text",
+      "typeSchema": null,
+      "notNull": false,
+      "dimensions": 0,
+      "default": null,
+      "generated": null,
+      "identity": null,
+      "name": "issuer",
       "entityType": "columns",
       "schema": "public",
       "table": "account"

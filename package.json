@@ -6,6 +6,7 @@
         "start": "bun run src/index.ts",
         "db:migrate": "bun run src/db/customSpawners/migrate.ts",
         "db:generate": "bun run src/db/customSpawners/generate.ts",
+        "db:seed": "bun run src/db/customSpawners/seed.ts",
         "auth:generate": "bun run src/db/customSpawners/authGenerate.ts"
     },
     "dependencies": {
