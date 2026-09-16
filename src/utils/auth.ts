@@ -3,7 +3,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "../db/schemas";
 import { dbClient } from "../db/dbClient";
 import { organization, genericOAuth } from "better-auth/plugins";
-import getInitialOrganizationAsync from "./helpers/organizationHelper";
+import {getInitialOrganizationAsync, getActiveOrganizationIdForUserAsync} from "./helpers/organizationHelper";
 import {
     ac,
     systemAdmin,
@@ -99,20 +99,31 @@ export const auth = betterAuth({
     ],
 
     databaseHooks: {
-    session: {
-      create: {
-        before: async (session) => {
-          const organization = await getInitialOrganizationAsync(session.userId);
-          return {
-            data: {
-              ...session,
-              activeOrganizationId: organization?.id,
+        session: {
+            create: {
+                before: async (session) => {
+                    const existingActiveOrganizationId =
+                        await getActiveOrganizationIdForUserAsync(session.userId);
+
+                    console.info("[auth] session create active organization resolved", {
+                        hasExistingActiveOrganization: Boolean(existingActiveOrganizationId),
+                    });
+
+                    const organization = existingActiveOrganizationId
+                        ? null
+                        : await getInitialOrganizationAsync(session.userId);
+
+                    return {
+                        data: {
+                            ...session,
+                            activeOrganizationId:
+                                existingActiveOrganizationId ?? organization?.id,
+                        },
+                    };
+                },
             },
-          };
         },
-      },
     },
-  },
 
     trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
 });

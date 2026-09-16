@@ -1,8 +1,29 @@
 import { dbClient } from "../../db/dbClient";
-import { organization, member } from "../../db/schemas";
-import { eq, InferSelectModel } from "drizzle-orm";
+import { organization, member, session } from "../../db/schemas";
+import { and, eq, InferSelectModel, isNotNull } from "drizzle-orm";
 
 type Organization = InferSelectModel<typeof organization>;
+
+export async function getActiveOrganizationIdForUserAsync(
+    userId: string,
+): Promise<string | null> {
+    const userSessions = await dbClient
+        .select({ activeOrganizationId: session.activeOrganizationId })
+        .from(session)
+        .where(
+            and(
+                eq(session.userId, userId),
+                isNotNull(session.activeOrganizationId),
+            ),
+        )
+        .limit(1);
+
+    console.info("[auth] active organization session lookup", {
+        found: userSessions.length > 0,
+    });
+
+    return userSessions[0]?.activeOrganizationId ?? null;
+}
 
 async function getOrganizationById(organizationId: string): Promise<Organization | null> {
     const org = await dbClient.select()
@@ -15,7 +36,7 @@ async function getOrganizationById(organizationId: string): Promise<Organization
     return org[0];
 }
 
-export default async function getInitialOrganizationAsync(userid: string): Promise<Organization | null> {
+export async function getInitialOrganizationAsync(userid: string): Promise<Organization | null> {
     const userMemberships = await dbClient.select()
         .from(member)
         .where(eq(member.userId, userid))
@@ -23,5 +44,6 @@ export default async function getInitialOrganizationAsync(userid: string): Promi
     if (userMemberships.length === 0) {
         return null;
     }
+
     return await getOrganizationById(userMemberships[0].organizationId);
 }
