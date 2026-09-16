@@ -9,6 +9,7 @@ import {
     systemAdmin,
     relative,
     citizen,
+    servicePartner,
     employee,
 } from "./accessController";
 
@@ -58,6 +59,7 @@ export const auth = betterAuth({
                 systemAdmin,
                 relative,
                 citizen,
+                servicePartner,
                 employee,
             },
             creatorRole: "systemAdmin",
