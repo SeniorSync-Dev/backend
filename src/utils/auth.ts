@@ -1,9 +1,15 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "../db/schemas";
-import { dbClient} from "../db/dbClient";
+import { dbClient } from "../db/dbClient";
 import { organization, genericOAuth } from "better-auth/plugins";
-import { ac, systemAdmin, relative, citizen, employee } from "./accessController";
+import {
+    ac,
+    systemAdmin,
+    relative,
+    citizen,
+    employee,
+} from "./accessController";
 import { hashNin } from "./cryptoService";
 
 export const auth = betterAuth({
@@ -16,6 +22,17 @@ export const auth = betterAuth({
         provider: "pg",
         schema: schema,
     }),
+
+    account: {
+        accountLinking: {
+            enabled: true,
+            // MitID is a trusted government IdP, and our synthetic MitID email is
+            // never "verified" locally, so require neither to auto-link the same
+            // MitID identity across the citizen/relative and employee sign-in flows.
+            trustedProviders: ["mitid"],
+            requireLocalEmailVerified: false,
+        },
+    },
 
     user: {
         additionalFields: {
@@ -41,8 +58,9 @@ export const auth = betterAuth({
                 systemAdmin,
                 relative,
                 citizen,
-                employee
-            }
+                employee,
+            },
+            creatorRole: "systemAdmin",
         }),
         genericOAuth({
             config: [

@@ -52,6 +52,9 @@ export const account = pgTable(
     accessTokenExpiresAt: timestamp("access_token_expires_at"),
     refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
     scope: text("scope"),
+    // Better Auth stores the OpenID Connect issuer for discovery-based OAuth
+    // providers (such as MitID). It is nullable for non-OIDC accounts.
+    issuer: text("issuer"),
     password: text("password"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
