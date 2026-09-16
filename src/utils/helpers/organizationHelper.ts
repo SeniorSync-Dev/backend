@@ -1,4 +1,3 @@
-import { auth } from "../auth";
 import { dbClient } from "../../db/dbClient";
 import { organization, member } from "../../db/schemas";
 import { eq, InferSelectModel } from "drizzle-orm";
