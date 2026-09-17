@@ -3,7 +3,11 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "../db/schemas";
 import { dbClient } from "../db/dbClient";
 import { organization, genericOAuth } from "better-auth/plugins";
-import {getInitialOrganizationAsync, getActiveOrganizationIdForUserAsync} from "./helpers/organizationHelper";
+import {
+    getInitialOrganizationAsync,
+    getActiveOrganizationIdForUserAsync,
+    linkCitizenToFacilityAsync,
+} from "./helpers/organizationHelper";
 import {
     ac,
     systemAdmin,
@@ -63,6 +67,27 @@ export const auth = betterAuth({
                 employee,
             },
             creatorRole: "systemAdmin",
+            schema: {
+                invitation: {
+                    additionalFields: {
+                        facilityId: {
+                            type: "string",
+                            required: false,
+                        },
+                    },
+                },
+            },
+            organizationHooks: {
+                afterAcceptInvitation: async ({ invitation, user }) => {
+                    const facilityId = invitation.facilityId as
+                        | string
+                        | null
+                        | undefined;
+                    if (invitation.role !== "citizen" || !facilityId) return;
+
+                    await linkCitizenToFacilityAsync(user.id, facilityId);
+                },
+            },
         }),
         genericOAuth({
             config: [
@@ -105,11 +130,18 @@ export const auth = betterAuth({
             create: {
                 before: async (session) => {
                     const existingActiveOrganizationId =
-                        await getActiveOrganizationIdForUserAsync(session.userId);
+                        await getActiveOrganizationIdForUserAsync(
+                            session.userId,
+                        );
 
-                    console.info("[auth] session create active organization resolved", {
-                        hasExistingActiveOrganization: Boolean(existingActiveOrganizationId),
-                    });
+                    console.info(
+                        "[auth] session create active organization resolved",
+                        {
+                            hasExistingActiveOrganization: Boolean(
+                                existingActiveOrganizationId,
+                            ),
+                        },
+                    );
 
                     const organization = existingActiveOrganizationId
                         ? null
@@ -119,7 +151,8 @@ export const auth = betterAuth({
                         data: {
                             ...session,
                             activeOrganizationId:
-                                existingActiveOrganizationId ?? organization?.id,
+                                existingActiveOrganizationId ??
+                                organization?.id,
                         },
                     };
                 },
