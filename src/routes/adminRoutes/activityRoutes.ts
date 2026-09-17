@@ -84,6 +84,7 @@ activityRoutes.post("/", async (c) => {
             endsAt: new Date(endsAt),
             capacity: capacity ? Number(capacity) : null,
             locationName: locationName || null,
+            status: "published",
         })
         .returning();
 
