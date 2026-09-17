@@ -127,6 +127,10 @@ export const relations = defineRelations(
                 from: r.organization.id,
                 to: r.invitation.organizationId,
             }),
+            facilities: r.many.facillity({
+                from: r.organization.id,
+                to: r.facillity.organizationId,
+            }),
         },
         member: {
             organization: r.one.organization({
@@ -272,6 +276,11 @@ export const relations = defineRelations(
             }),
         },
         facillity: {
+            organization: r.one.organization({
+                from: r.facillity.organizationId,
+                to: r.organization.id,
+                optional: false,
+            }),
             citizens: r.many.citizen({
                 from: r.facillity.id.through(r.citizenFacilities.facilityId),
                 to: r.citizen.userId.through(r.citizenFacilities.citizenUserId),

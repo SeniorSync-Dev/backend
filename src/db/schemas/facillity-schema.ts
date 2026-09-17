@@ -9,6 +9,7 @@ import {
     timestamp,
 } from "drizzle-orm/pg-core";
 import { citizen, employee } from "./subUser-schema";
+import { organization } from "./auth-schema";
 
 export const facilityTypeEnum = pgEnum("facility_type", [
     "nursing_home",
@@ -44,6 +45,9 @@ export const address = pgTable("addresses", {
 
 export const facillity = pgTable("facilities", {
     id: uuid("id").primaryKey().defaultRandom(),
+    organizationId: text("organization_id")
+        .notNull()
+        .references(() => organization.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     type: facilityTypeEnum("type").notNull(),
     addressId: uuid("address_id")

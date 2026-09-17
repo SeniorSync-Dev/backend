@@ -1,0 +1,2 @@
+ALTER TABLE "facilities" ADD COLUMN "organization_id" text NOT NULL;--> statement-breakpoint
+ALTER TABLE "facilities" ADD CONSTRAINT "facilities_organization_id_organization_id_fkey" FOREIGN KEY ("organization_id") REFERENCES "organization"("id") ON DELETE CASCADE;
