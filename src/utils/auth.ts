@@ -1,12 +1,21 @@
 import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { drizzleAdapter } from "@better-auth/drizzle-adapter";
 import * as schema from "../db/schemas";
-import dbClient from "../db/dbClient";
-import { admin as adminPlugin, genericOAuth } from "better-auth/plugins";
-import { createAuthMiddleware, getOAuthState } from "better-auth/api";
-import { ac, admin, relative, citizen, employee } from "./accessController";
-import { hashNin } from "./cryptoService";
-import { and, eq, isNull } from "drizzle-orm";
+import { dbClient } from "../db/dbClient";
+import { organization, genericOAuth } from "better-auth/plugins";
+import {
+    getInitialOrganizationAsync,
+    getActiveOrganizationIdForUserAsync,
+    linkCitizenToFacilityAsync,
+} from "./helpers/organizationHelper";
+import {
+    ac,
+    systemAdmin,
+    relative,
+    citizen,
+    servicePartner,
+    employee,
+} from "./accessController";
 
 export const auth = betterAuth({
     baseURL: process.env.BETTER_AUTH_URL,
@@ -19,6 +28,17 @@ export const auth = betterAuth({
         schema: schema,
     }),
 
+    account: {
+        accountLinking: {
+            enabled: true,
+            // MitID is a trusted government IdP, and our synthetic MitID email is
+            // never "verified" locally, so require neither to auto-link the same
+            // MitID identity across the citizen/relative and employee sign-in flows.
+            trustedProviders: ["mitid"],
+            requireLocalEmailVerified: false,
+        },
+    },
+
     user: {
         additionalFields: {
             birthdate: {
@@ -26,10 +46,6 @@ export const auth = betterAuth({
                 required: false,
             },
             nin: {
-                type: "string",
-                required: false,
-            },
-            ninHash: {
                 type: "string",
                 required: false,
             },
@@ -41,15 +57,36 @@ export const auth = betterAuth({
     },
 
     plugins: [
-        adminPlugin({
+        organization({
             ac,
-            adminRole: admin,
-            defaultRole: "relative",
             roles: {
-                relative: relative,
-                citizen: citizen,
-                employee: employee,
-                admin: admin,
+                systemAdmin,
+                relative,
+                citizen,
+                servicePartner,
+                employee,
+            },
+            creatorRole: "systemAdmin",
+            schema: {
+                invitation: {
+                    additionalFields: {
+                        facilityId: {
+                            type: "string",
+                            required: false,
+                        },
+                    },
+                },
+            },
+            organizationHooks: {
+                afterAcceptInvitation: async ({ invitation, user }) => {
+                    const facilityId = invitation.facilityId as
+                        | string
+                        | null
+                        | undefined;
+                    if (invitation.role !== "citizen" || !facilityId) return;
+
+                    await linkCitizenToFacilityAsync(user.id, facilityId);
+                },
             },
         }),
         genericOAuth({
@@ -80,7 +117,6 @@ export const auth = betterAuth({
 
                             birthdate: profile.birthdate ?? null,
                             nin,
-                            ninHash: nin ? hashNin(nin) : null,
                             mitidUuid: profile.mitid_uuid ?? null,
                         };
                     },
@@ -89,87 +125,39 @@ export const auth = betterAuth({
         }),
     ],
 
-    hooks: {
-        after: createAuthMiddleware(async (ctx) => {
-            console.log("Request path:", ctx.path);
-            // Only run this hook for the MitID callback route
-            if (ctx.path !== "/callback/:id") {
-                return;
-            }
+    databaseHooks: {
+        session: {
+            create: {
+                before: async (session) => {
+                    const existingActiveOrganizationId =
+                        await getActiveOrganizationIdForUserAsync(
+                            session.userId,
+                        );
 
-            const session = ctx.context.newSession;
+                    console.info(
+                        "[auth] session create active organization resolved",
+                        {
+                            hasExistingActiveOrganization: Boolean(
+                                existingActiveOrganizationId,
+                            ),
+                        },
+                    );
 
-            if (!session?.user) {
-                return;
-            }
+                    const organization = existingActiveOrganizationId
+                        ? null
+                        : await getInitialOrganizationAsync(session.userId);
 
-            const userId = session.user.id;
-
-            // Employees are pre-registered by an admin with their CPR, so match
-            // them by nin hash before falling back to self-declared account types.
-            const ninHash = (session.user as { ninHash?: string | null })
-                .ninHash;
-
-            if (ninHash) {
-                const [matchedEmployee] = await dbClient
-                    .update(schema.employee)
-                    .set({ userId })
-                    .where(
-                        and(
-                            eq(schema.employee.ninHash, ninHash),
-                            isNull(schema.employee.userId),
-                        ),
-                    )
-                    .returning();
-
-                if (matchedEmployee) {
-                    //TODO - Set the role to "employee" for the user
-                    return;
-                }
-            }
-
-            // Get the OAuth state from the request, which contains the account type
-            const oauthState = await getOAuthState<{
-                accountype: "citizen" | "relative";
-            }>();
-
-            const accountType = oauthState?.accountType;
-            console.log("Account type from OAuth state:", accountType);
-            if (!accountType) {
-                return;
-            }
-
-            const allowedAccountTypes = ["citizen", "relative"] as const;
-
-            if (!allowedAccountTypes.includes(accountType)) {
-                console.error(`Invalid account type: ${accountType}`);
-                throw new Error(`Invalid account type: ${accountType}`);
-            }
-
-            switch (accountType) {
-                case "citizen": {
-                    await dbClient
-                        .insert(schema.citizen)
-                        .values({
-                            userId,
-                        })
-                        .onConflictDoNothing();
-                    //TODO - Set the role to "citizen" for the user
-                    break;
-                }
-
-                case "relative": {
-                    await dbClient
-                        .insert(schema.relative)
-                        .values({
-                            userId,
-                        })
-                        .onConflictDoNothing();
-                    // TODO - Set the role to "relative" for the user
-                    break;
-                }
-            }
-        }),
+                    return {
+                        data: {
+                            ...session,
+                            activeOrganizationId:
+                                existingActiveOrganizationId ??
+                                organization?.id,
+                        },
+                    };
+                },
+            },
+        },
     },
 
     trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
