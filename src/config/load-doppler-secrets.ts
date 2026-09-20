@@ -8,6 +8,9 @@ const requiredSecrets = [
     "MITID_CLIENT_ID",
     "MITID_CLIENT_SECRET",
     "MITID_DISCOVERY_URL",
+    "MQTT_BROKER_URL",
+    "MQTT_USERNAME",
+    "MQTT_PASSWORD",
 ] as const;
 
 export async function loadDopplerSecrets(): Promise<void> {
