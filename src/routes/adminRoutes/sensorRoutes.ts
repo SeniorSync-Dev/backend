@@ -1,7 +1,7 @@
 import { Hono } from "hono";
-import { and, asc, count, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
-import { sensorDevice, user } from "../../db/schemas";
+import { member, sensorDevice, user } from "../../db/schemas";
 import {
     requireSession,
     type SessionVariables,
@@ -16,6 +16,11 @@ const MAX_PAGE_SIZE = 100;
 sensorRoutes.use("*", requireSession);
 
 sensorRoutes.get("/", async (c) => {
+    const organizationId = c.get("session").activeOrganizationId;
+    if (!organizationId) {
+        return c.json({ message: "No active organization" }, 400);
+    }
+
     const authHeaders = c.req.raw.headers;
     if (await hasPermission(authHeaders, "sensor", "read") === false) {
         return c.json(
@@ -64,7 +69,21 @@ sensorRoutes.get("/", async (c) => {
               : undefined;
     const statusFilter =
         status === "all" ? undefined : eq(sensorDevice.status, status);
-    const filters = and(assignmentFilter, statusFilter);
+    const visibleToOrganizationFilter = or(
+        isNull(sensorDevice.citizenUserId),
+        inArray(
+            sensorDevice.citizenUserId,
+            dbClient
+                .select({ userId: member.userId })
+                .from(member)
+                .where(eq(member.organizationId, organizationId)),
+        ),
+    );
+    const filters = and(
+        assignmentFilter,
+        statusFilter,
+        visibleToOrganizationFilter,
+    );
 
     const [sensors, [total]] = await Promise.all([
         dbClient
