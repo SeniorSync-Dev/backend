@@ -1,6 +1,6 @@
 import mqtt, { MqttClient } from "mqtt";
 import { handleFallSensorStatusChangeAsync } from "./helpers/alarmHelper";
-import type { FallSensorStatusChange } from "./helpers/alarmHelper";
+import type { StatusChange } from "./helpers/alarmHelper";
 
 const clientId = `mqttBackend_${Math.random().toString(16).slice(3)}`;
 
@@ -65,11 +65,12 @@ export function connectMqtt(): MqttClient {
     client.on('message', async (topic, message, packet) => {
         try {
             if (topic.includes('seniorsync/fallsensor/status')) {
-                const statusChange: FallSensorStatusChange = JSON.parse(message.toString());
+                const statusChange: StatusChange = JSON.parse(message.toString());
                 await handleFallSensorStatusChangeAsync(statusChange);
             } else if (topic.includes('seniorsync/fallsensor/fall')) {
                 console.log(`Received fall message: ${message.toString()}`);
-                // handle sensor messages
+                const statusChange: StatusChange = JSON.parse(message.toString());
+                await handleFallSensorStatusChangeAsync(statusChange);
             } else {
                 console.log(`Received message on unknown topic: ${topic}`);
             }

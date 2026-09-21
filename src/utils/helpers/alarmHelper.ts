@@ -1,24 +1,25 @@
 import { eq } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
-import { sensorDevice } from "../../db/schemas";
+import { sensorDevice, sensorEvent } from "../../db/schemas";
 import { getClient } from "../mqttService";
 
-export interface FallSensorStatusChange {
+export interface StatusChange {
     deviceId: string;
-    event: "device_online" | "device_offline";
+    event: "device_online" | "device_offline" | "fall_detected";
     timestamp: Date;
 }
 
-export async function handleFallSensorStatusChangeAsync(statusChange: FallSensorStatusChange): Promise<void> {
+export async function handleFallSensorStatusChangeAsync(statusChange: StatusChange): Promise<void> {
     const handlers = {
         device_online: handleOnlineStatusAsync,
         device_offline: handleOfflineStatusAsync,
+        fall_detected: handleFallStatusAsync,
     };
 
     await handlers[statusChange.event](statusChange);
 }
 
-async function handleOnlineStatusAsync(statusChange: FallSensorStatusChange): Promise<void> {
+async function handleOnlineStatusAsync(statusChange: StatusChange): Promise<void> {
     const device = await findDeviceAsync(statusChange.deviceId);
 
     if (!device) {
@@ -33,7 +34,7 @@ async function handleOnlineStatusAsync(statusChange: FallSensorStatusChange): Pr
     }
 }
 
-async function handleOfflineStatusAsync(statusChange: FallSensorStatusChange): Promise<void> {
+async function handleOfflineStatusAsync(statusChange: StatusChange): Promise<void> {
     const device = await findDeviceAsync(statusChange.deviceId);
 
     if (!device) {
@@ -42,6 +43,33 @@ async function handleOfflineStatusAsync(statusChange: FallSensorStatusChange): P
     }
 
     await updateDeviceStatusAsync(statusChange, "offline");
+}
+
+export async function handleFallStatusAsync(statusChange: StatusChange): Promise<void> {
+    const device = await findDeviceAsync(statusChange.deviceId);
+    console.log(`Received fall_detected event for device ${statusChange.deviceId}. Device found: ${!!device}`);
+    if (!device) {
+        console.warn(`Received fall_detected event for unknown device ${statusChange.deviceId}. Ignoring.`);
+        return;
+    }
+
+    if (device.citizenUserId === null) {
+        console.warn(`Received fall_detected event for device ${statusChange.deviceId} which is not linked to a citizen. Ignoring.`);
+        return;
+    }
+
+    await dbClient
+        .insert(sensorEvent)
+        .values({
+            deviceId: device.id,
+            citizenUserId: device.citizenUserId,
+            eventType: "fall_detected",
+            severity: "critical",
+            status: "new",
+            payload: JSON.stringify(statusChange),
+            occurredAt: statusChange.timestamp,
+        })
+        .onConflictDoNothing({ target: sensorEvent.deviceId });
 }
 
 async function findDeviceAsync(deviceId: string) {
@@ -54,7 +82,7 @@ async function findDeviceAsync(deviceId: string) {
     return device;
 }
 
-async function createDeviceAsync({ deviceId, timestamp }: FallSensorStatusChange, status: "active" | "offline",): Promise<void> {
+async function createDeviceAsync({ deviceId, timestamp }: StatusChange, status: "active" | "offline",): Promise<void> {
     console.log(`Device with ID ${deviceId} not found in database. Creating new record.`);
 
     await dbClient
@@ -63,13 +91,13 @@ async function createDeviceAsync({ deviceId, timestamp }: FallSensorStatusChange
             serialNumber: deviceId,
             status,
             type: "fall_alarm",
-            mqttTopic: `seniorsync/fallsensor/status/callback/${deviceId}`,
+            mqttTopic: `seniorsync/fallsensor/callback/${deviceId}`,
             lastSeenAt: timestamp,
         })
         .onConflictDoNothing({ target: sensorDevice.serialNumber });
 }
 
-async function updateDeviceStatusAsync({ deviceId, timestamp }: FallSensorStatusChange, status: "active" | "offline",): Promise<void> {
+async function updateDeviceStatusAsync({ deviceId, timestamp }: StatusChange, status: "active" | "offline",): Promise<void> {
     console.log(`Device with ID ${deviceId} found in database. Updating record.`);
     await dbClient
         .update(sensorDevice)
