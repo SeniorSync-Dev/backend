@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { and, asc, count, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
-import { member, sensorDevice, user } from "../../db/schemas";
+import { citizen, member, sensorDevice, user } from "../../db/schemas";
 import {
     requireSession,
     type SessionVariables,
@@ -126,6 +126,96 @@ sensorRoutes.get("/", async (c) => {
             totalPages: Math.ceil(totalItems / pageSize),
         },
     });
+});
+
+sensorRoutes.patch("/:id/assignment", async (c) => {
+    const organizationId = c.get("session").activeOrganizationId;
+    if (!organizationId) {
+        return c.json({ message: "No active organization" }, 400);
+    }
+
+    if (await hasPermission(c.req.raw.headers, "sensor", "update") === false) {
+        return c.json(
+            { message: "You do not have permission to assign sensors." },
+            403,
+        );
+    }
+
+    const sensorId = c.req.param("id");
+
+    const body = await c.req.json<{ citizenUserId?: string }>();
+    if (typeof body.citizenUserId !== "string" || !body.citizenUserId) {
+        return c.json({ message: "citizenUserId is required" }, 400);
+    }
+
+    const [citizenInOrganization] = await dbClient
+        .select({ userId: citizen.userId })
+        .from(citizen)
+        .innerJoin(member, eq(member.userId, citizen.userId))
+        .where(
+            and(
+                eq(citizen.userId, body.citizenUserId),
+                eq(member.organizationId, organizationId),
+            ),
+        )
+        .limit(1);
+
+    if (!citizenInOrganization) {
+        return c.json({ message: "Citizen not found" }, 404);
+    }
+
+    const citizensInOrganization = dbClient
+        .select({ userId: member.userId })
+        .from(member)
+        .where(eq(member.organizationId, organizationId));
+
+    const [updatedSensor] = await dbClient
+        .update(sensorDevice)
+        .set({ citizenUserId: citizenInOrganization.userId })
+        .where(
+            and(
+                eq(sensorDevice.id, sensorId),
+                or(
+                    isNull(sensorDevice.citizenUserId),
+                    inArray(sensorDevice.citizenUserId, citizensInOrganization),
+                ),
+            ),
+        )
+        .returning();
+
+    if (!updatedSensor) {
+        return c.json({ message: "Sensor not found" }, 404);
+    }
+
+    return c.json(updatedSensor);
+});
+
+sensorRoutes.patch("/:id/unassignment", async (c) => {
+    const organizationId = c.get("session").activeOrganizationId;
+    if (!organizationId) {
+        return c.json({ message: "No active organization" }, 400);
+    }
+
+    if (await hasPermission(c.req.raw.headers, "sensor", "update") === false) {
+        return c.json(
+            { message: "You do not have permission to unassign sensors." },
+            403,
+        );
+    }
+
+    const sensorId = c.req.param("id");
+
+    const [updatedSensor] = await dbClient
+        .update(sensorDevice)
+        .set({ citizenUserId: null })
+        .where(eq(sensorDevice.id, sensorId))
+        .returning();
+
+    if (!updatedSensor) {
+        return c.json({ message: "Sensor not found" }, 404);
+    }
+
+    return c.json(updatedSensor);
 });
 
 function parsePositiveInteger(
