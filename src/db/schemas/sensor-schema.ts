@@ -4,7 +4,6 @@ import {
     text,
     uuid,
     integer,
-    boolean,
     timestamp,
 } from "drizzle-orm/pg-core";
 import { citizen, employee } from "./subUser-schema";
@@ -59,6 +58,9 @@ export const sensorEventStatusEnum = pgEnum("sensor_event_status", [
 
 export const sensorDevice = pgTable("sensor_devices", {
     id: uuid("id").primaryKey().defaultRandom(),
+    citizenUserId: text("citizen_user_id")
+        .notNull()
+        .references(() => citizen.userId),
     serialNumber: text("serial_number").notNull().unique(),
     type: sensorDeviceTypeEnum("type").notNull(),
     model: text("model"),
@@ -75,21 +77,6 @@ export const sensorDevice = pgTable("sensor_devices", {
         .defaultNow()
         .$onUpdate(() => new Date())
         .notNull(),
-});
-
-export const citizenSensorDevice = pgTable("citizen_sensor_devices", {
-    id: uuid("id").primaryKey().defaultRandom(),
-    citizenUserId: text("citizen_user_id")
-        .notNull()
-        .references(() => citizen.userId),
-    // Only one active assignment per device at a time - enforced in app logic
-    deviceId: uuid("device_id")
-        .notNull()
-        .references(() => sensorDevice.id),
-    assignedAt: timestamp("assigned_at").notNull(),
-    unassignedAt: timestamp("unassigned_at"),
-    isActive: boolean("is_active").default(true).notNull(),
-    notes: text("notes"),
 });
 
 export const sensorEvent = pgTable("sensor_events", {
