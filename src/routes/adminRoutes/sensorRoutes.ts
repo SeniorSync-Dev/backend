@@ -16,15 +16,15 @@ const MAX_PAGE_SIZE = 100;
 sensorRoutes.use("*", requireSession);
 
 sensorRoutes.get("/", async (c) => {
-    // const authHeaders = c.req.raw.headers;
-    // if (await hasPermission(authHeaders, "sensor", "read") === false) {
-    //     return c.json(
-    //         {
-    //             message: "You do not have permission to read sensors.",
-    //         },
-    //         403,
-    //     );
-    // }
+    const authHeaders = c.req.raw.headers;
+    if (await hasPermission(authHeaders, "sensor", "read") === false) {
+        return c.json(
+            {
+                message: "You do not have permission to read sensors.",
+            },
+            403,
+        );
+    }
 
     const assignment = c.req.query("assignment") ?? "all";
     const status = c.req.query("status") ?? "all";
