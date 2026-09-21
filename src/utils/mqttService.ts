@@ -63,6 +63,8 @@ export function connectMqtt(): MqttClient {
     });
 
     client.on('message', async (topic, message, packet) => {
+        // Optional: skip duplicated re-delivery
+        if (packet.dup) return;
         try {
             if (topic.includes('seniorsync/fallsensor/status')) {
                 const statusChange: StatusChange = JSON.parse(message.toString());
@@ -75,10 +77,9 @@ export function connectMqtt(): MqttClient {
                 console.log(`Received message on unknown topic: ${topic}`);
             }
 
-            // Optional: skip duplicated re-delivery
-            if (packet.dup) return;
+
         } catch (err) {
-            console.error('Failed to parse message:', err);
+            console.error('Failed to process MQTT message:', err);
         }
     });
 
