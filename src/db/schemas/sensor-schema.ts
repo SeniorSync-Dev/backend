@@ -59,7 +59,6 @@ export const sensorEventStatusEnum = pgEnum("sensor_event_status", [
 export const sensorDevice = pgTable("sensor_devices", {
     id: uuid("id").primaryKey().defaultRandom(),
     citizenUserId: text("citizen_user_id")
-        .notNull()
         .references(() => citizen.userId),
     serialNumber: text("serial_number").notNull().unique(),
     type: sensorDeviceTypeEnum("type").notNull(),

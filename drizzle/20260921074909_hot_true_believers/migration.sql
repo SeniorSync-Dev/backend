@@ -1,0 +1,1 @@
+ALTER TABLE "sensor_devices" ALTER COLUMN "citizen_user_id" DROP NOT NULL;
