@@ -3,6 +3,7 @@ import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import {
     activitySignup,
+    careTask,
     citizen,
     citizenFacilities,
     citizenInviteCode,
@@ -18,6 +19,7 @@ import {
 import { getApprovedRelativeLinkAsync } from "../../utils/helpers/relativeAccessHelper";
 import {
     getAppointmentsForCitizenAsync,
+    startOfToday,
     toActivityDto,
     visibleActivitiesForCitizenAsync,
 } from "../../utils/helpers/citizenDataHelper";
@@ -86,14 +88,206 @@ relativeRoutes.get("/citizens", async (c) => {
     return c.json(citizens);
 });
 
+relativeRoutes.delete("/citizens/:citizenId", async (c) => {
+    const relativeUserId = c.get("user").id;
+    const citizenId = c.req.param("citizenId");
+
+    const [removed] = await dbClient
+        .delete(relativeCitizen)
+        .where(
+            and(
+                eq(relativeCitizen.relativeUserId, relativeUserId),
+                eq(relativeCitizen.citizenUserId, citizenId),
+            ),
+        )
+        .returning();
+
+    if (!removed) {
+        return c.json({ error: "Du er ikke tilknyttet denne borger." }, 404);
+    }
+
+    return c.json({ status: "removed" });
+});
+
 relativeRoutes.get("/citizens/:citizenId/appointments", async (c) => {
     const relativeUserId = c.get("user").id;
     const citizenId = c.req.param("citizenId");
 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
-    if (!link) return c.json({ error: "You do not have access to this citizen." }, 403);
+    if (!link) return c.json({ error: "Du har ikke adgang til denne borger." }, 403);
 
-    const appointments = await getAppointmentsForCitizenAsync(citizenId);
+    const appointments = await getAppointmentsForCitizenAsync(citizenId, {
+        from: startOfToday(),
+        includeCompleted: true,
+    });
+    return c.json(appointments);
+});
+
+relativeRoutes.post("/citizens/:citizenId/visits", async (c) => {
+    const relativeUserId = c.get("user").id;
+    const citizenId = c.req.param("citizenId");
+
+    const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
+    if (!link) return c.json({ error: "Du har ikke adgang til denne borger." }, 403);
+
+    const { title, start, end, description } = await c.req.json();
+
+    if (!start || !end) {
+        return c.json(
+            { error: "Start- og sluttidspunkt er påkrævet." },
+            400,
+        );
+    }
+
+    if (new Date(end) < new Date(start)) {
+        return c.json(
+            { error: "Sluttidspunktet kan ikke være før starttidspunktet." },
+            400,
+        );
+    }
+
+    await dbClient.insert(careTask).values({
+        citizenUserId: citizenId,
+        type: "visit",
+        title: title ? String(title) : "Besøg",
+        description: description ? String(description) : undefined,
+        scheduledStart: new Date(start),
+        scheduledEnd: new Date(end),
+        createdByUserId: relativeUserId,
+    });
+
+    const appointments = await getAppointmentsForCitizenAsync(citizenId, {
+        from: startOfToday(),
+        includeCompleted: true,
+    });
+    return c.json(appointments, 201);
+});
+
+relativeRoutes.patch("/citizens/:citizenId/visits/:visitId", async (c) => {
+    const relativeUserId = c.get("user").id;
+    const citizenId = c.req.param("citizenId");
+    const visitId = c.req.param("visitId");
+
+    const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
+    if (!link) return c.json({ error: "Du har ikke adgang til denne borger." }, 403);
+
+    const { title, start, end, description } = await c.req.json();
+
+    if (!start || !end) {
+        return c.json(
+            { error: "Start- og sluttidspunkt er påkrævet." },
+            400,
+        );
+    }
+
+    if (new Date(end) < new Date(start)) {
+        return c.json(
+            { error: "Sluttidspunktet kan ikke være før starttidspunktet." },
+            400,
+        );
+    }
+
+    const [updated] = await dbClient
+        .update(careTask)
+        .set({
+            title: title ? String(title) : "Besøg",
+            description: description ? String(description) : null,
+            scheduledStart: new Date(start),
+            scheduledEnd: new Date(end),
+        })
+        .where(
+            and(
+                eq(careTask.id, visitId),
+                eq(careTask.citizenUserId, citizenId),
+                eq(careTask.type, "visit"),
+                eq(careTask.createdByUserId, relativeUserId),
+            ),
+        )
+        .returning();
+
+    if (!updated) {
+        return c.json({ error: "Besøget findes ikke, eller du kan ikke redigere det." }, 404);
+    }
+
+    const appointments = await getAppointmentsForCitizenAsync(citizenId, {
+        from: startOfToday(),
+        includeCompleted: true,
+    });
+    return c.json(appointments);
+});
+
+relativeRoutes.patch(
+    "/citizens/:citizenId/visits/:visitId/complete",
+    async (c) => {
+        const relativeUserId = c.get("user").id;
+        const citizenId = c.req.param("citizenId");
+        const visitId = c.req.param("visitId");
+
+        const link = await getApprovedRelativeLinkAsync(
+            relativeUserId,
+            citizenId,
+            "canView",
+        );
+        if (!link)
+            return c.json({ error: "Du har ikke adgang til denne borger." }, 403);
+
+        const [updated] = await dbClient
+            .update(careTask)
+            .set({ status: "completed", completedAt: new Date() })
+            .where(
+                and(
+                    eq(careTask.id, visitId),
+                    eq(careTask.citizenUserId, citizenId),
+                    eq(careTask.type, "visit"),
+                    eq(careTask.createdByUserId, relativeUserId),
+                ),
+            )
+            .returning();
+
+        if (!updated) {
+            return c.json(
+                { error: "Besøget findes ikke, eller du kan ikke ændre det." },
+                404,
+            );
+        }
+
+        const appointments = await getAppointmentsForCitizenAsync(citizenId, {
+            from: startOfToday(),
+            includeCompleted: true,
+        });
+        return c.json(appointments);
+    },
+);
+
+relativeRoutes.delete("/citizens/:citizenId/visits/:visitId", async (c) => {
+    const relativeUserId = c.get("user").id;
+    const citizenId = c.req.param("citizenId");
+    const visitId = c.req.param("visitId");
+
+    const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
+    if (!link) return c.json({ error: "Du har ikke adgang til denne borger." }, 403);
+
+    const [updated] = await dbClient
+        .update(careTask)
+        .set({ status: "cancelled" })
+        .where(
+            and(
+                eq(careTask.id, visitId),
+                eq(careTask.citizenUserId, citizenId),
+                eq(careTask.type, "visit"),
+                eq(careTask.createdByUserId, relativeUserId),
+            ),
+        )
+        .returning();
+
+    if (!updated) {
+        return c.json({ error: "Besøget findes ikke, eller du kan ikke slette det." }, 404);
+    }
+
+    const appointments = await getAppointmentsForCitizenAsync(citizenId, {
+        from: startOfToday(),
+        includeCompleted: true,
+    });
     return c.json(appointments);
 });
 
@@ -102,7 +296,7 @@ relativeRoutes.get("/citizens/:citizenId/activities", async (c) => {
     const citizenId = c.req.param("citizenId");
 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
-    if (!link) return c.json({ error: "You do not have access to this citizen." }, 403);
+    if (!link) return c.json({ error: "Du har ikke adgang til denne borger." }, 403);
 
     const rows = await visibleActivitiesForCitizenAsync(citizenId);
     return c.json(rows.map(toActivityDto));
@@ -114,21 +308,21 @@ relativeRoutes.post("/citizens/:citizenId/activities/:activityId/signup", async 
     const activityId = c.req.param("activityId");
 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canBookActivities");
-    if (!link) return c.json({ error: "You do not have access to sign up this citizen." }, 403);
+    if (!link) return c.json({ error: "Du har ikke adgang til at tilmelde denne borger." }, 403);
 
     if (!UUID_PATTERN.test(activityId)) {
-        return c.json({ error: "The activity does not exist." }, 404);
+        return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 
     const [current] = await visibleActivitiesForCitizenAsync(citizenId, activityId);
-    if (!current) return c.json({ error: "The activity does not exist." }, 404);
+    if (!current) return c.json({ error: "Aktiviteten findes ikke." }, 404);
 
     if (current.isSignedUp) {
         return c.json(toActivityDto(current));
     }
 
     if (current.capacity !== null && current.registeredCount >= current.capacity) {
-        return c.json({ error: "There are no spots left." }, 409);
+        return c.json({ error: "Der er ingen ledige pladser." }, 409);
     }
 
     const [existing] = await dbClient
@@ -166,14 +360,14 @@ relativeRoutes.delete("/citizens/:citizenId/activities/:activityId/signup", asyn
     const activityId = c.req.param("activityId");
 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canBookActivities");
-    if (!link) return c.json({ error: "You do not have access to cancel for this citizen." }, 403);
+    if (!link) return c.json({ error: "Du har ikke adgang til at afmelde denne borger." }, 403);
 
     if (!UUID_PATTERN.test(activityId)) {
-        return c.json({ error: "The activity does not exist." }, 404);
+        return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 
     const [current] = await visibleActivitiesForCitizenAsync(citizenId, activityId);
-    if (!current) return c.json({ error: "The activity does not exist." }, 404);
+    if (!current) return c.json({ error: "Aktiviteten findes ikke." }, 404);
 
     await dbClient
         .update(activitySignup)
@@ -204,7 +398,7 @@ relativeRoutes.get("/invitations/:code", async (c) => {
         .limit(1);
 
     if (!invite) {
-        return c.json({ error: "The code is invalid or has expired." }, 404);
+        return c.json({ error: "Koden er ugyldig eller udløbet." }, 404);
     }
 
     const [citizenRow] = await dbClient
@@ -242,7 +436,7 @@ relativeRoutes.post("/invitations/redeem", async (c) => {
     const { code, relationshipType } = await c.req.json();
 
     if (!code || !relationshipType) {
-        return c.json({ error: "Code and relationship are required." }, 400);
+        return c.json({ error: "Kode og relation er påkrævet." }, 400);
     }
 
     const [invite] = await dbClient
@@ -257,7 +451,7 @@ relativeRoutes.post("/invitations/redeem", async (c) => {
         .limit(1);
 
     if (!invite) {
-        return c.json({ error: "The code is invalid or has expired." }, 404);
+        return c.json({ error: "Koden er ugyldig eller udløbet." }, 404);
     }
 
     const [existing] = await dbClient
@@ -272,10 +466,9 @@ relativeRoutes.post("/invitations/redeem", async (c) => {
         .limit(1);
 
     if (existing) {
-        return c.json({ error: "You already have a request for this citizen." }, 409);
+        return c.json({ error: "Du har allerede en anmodning til denne borger." }, 409);
     }
 
-    // No relative row exists yet for a user until they link their first citizen.
     await dbClient.insert(relative).values({ userId: relativeUserId }).onConflictDoNothing();
 
     await dbClient.insert(relativeCitizen).values({

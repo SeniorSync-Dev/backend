@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import {
     activity,
@@ -12,9 +12,49 @@ import {
 import { AppointmentModel } from "../../models/appointment";
 import { ActivityModel } from "../../models/activity";
 
-export async function getAppointmentsForCitizenAsync(citizenUserId: string) {
-    const now = new Date();
+export function startOfToday() {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+}
 
+export const APPOINTMENT_WINDOW_DAYS = 14;
+
+async function getHomeFacilityNameAsync(citizenUserId: string) {
+    const [row] = await dbClient
+        .select({ name: facillity.name })
+        .from(citizenFacilities)
+        .innerJoin(facillity, eq(citizenFacilities.facilityId, facillity.id))
+        .where(
+            and(
+                eq(citizenFacilities.citizenUserId, citizenUserId),
+                or(
+                    isNull(citizenFacilities.endDate),
+                    gte(citizenFacilities.endDate, sql`current_date`),
+                ),
+            ),
+        )
+        .orderBy(desc(citizenFacilities.isPrimary))
+        .limit(1);
+
+    return row?.name;
+}
+
+export function appointmentWindowEnd() {
+    const date = new Date();
+    date.setDate(date.getDate() + APPOINTMENT_WINDOW_DAYS);
+    date.setHours(23, 59, 59, 999);
+    return date;
+}
+
+export async function getAppointmentsForCitizenAsync(
+    citizenUserId: string,
+    {
+        from = new Date(),
+        to,
+        includeCompleted = false,
+    }: { from?: Date; to?: Date; includeCompleted?: boolean } = {},
+) {
     const tasks = await dbClient
         .select({
             id: careTask.id,
@@ -25,6 +65,8 @@ export async function getAppointmentsForCitizenAsync(citizenUserId: string) {
             end: careTask.scheduledEnd,
             facilityName: facillity.name,
             staffName: user.name,
+            createdByUserId: careTask.createdByUserId,
+            status: careTask.status,
         })
         .from(careTask)
         .leftJoin(facillity, eq(careTask.facilityId, facillity.id))
@@ -33,11 +75,17 @@ export async function getAppointmentsForCitizenAsync(citizenUserId: string) {
         .where(
             and(
                 eq(careTask.citizenUserId, citizenUserId),
-                inArray(careTask.status, ["planned", "in_progress"]),
+                inArray(
+                    careTask.status,
+                    includeCompleted
+                        ? ["planned", "in_progress", "completed"]
+                        : ["planned", "in_progress"],
+                ),
                 gte(
                     sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart})`,
-                    now,
+                    from,
                 ),
+                to ? lte(careTask.scheduledStart, to) : undefined,
             ),
         )
         .orderBy(asc(careTask.scheduledStart));
@@ -59,9 +107,12 @@ export async function getAppointmentsForCitizenAsync(citizenUserId: string) {
                 eq(activitySignup.citizenUserId, citizenUserId),
                 eq(activitySignup.status, "registered"),
                 eq(activity.status, "published"),
-                gte(activity.endsAt, now),
+                gte(activity.endsAt, from),
+                to ? lte(activity.startsAt, to) : undefined,
             ),
         );
+
+    const homeFacilityName = await getHomeFacilityNameAsync(citizenUserId);
 
     const appointments: AppointmentModel[] = [
         ...tasks.map(
@@ -72,8 +123,10 @@ export async function getAppointmentsForCitizenAsync(citizenUserId: string) {
                 description: task.description ?? undefined,
                 start: task.start.toISOString(),
                 end: task.end?.toISOString(),
-                location: task.facilityName ?? undefined,
+                location: task.facilityName ?? homeFacilityName,
                 staffName: task.staffName ?? undefined,
+                createdByUserId: task.createdByUserId,
+                isCompleted: task.status === "completed",
             }),
         ),
         ...signups.map(
@@ -112,6 +165,7 @@ export async function visibleActivitiesForCitizenAsync(
         .select({
             id: activity.id,
             title: activity.title,
+            description: activity.description,
             start: activity.startsAt,
             end: activity.endsAt,
             capacity: activity.capacity,
@@ -150,6 +204,7 @@ export function toActivityDto(row: VisibleActivity): ActivityModel {
     return {
         id: row.id,
         title: row.title,
+        description: row.description ?? undefined,
         start: row.start.toISOString(),
         end: row.end.toISOString(),
         location: row.locationName ?? row.facilityName,

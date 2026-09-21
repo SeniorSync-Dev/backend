@@ -9,7 +9,9 @@ import {
 } from "../../middleware/require-session";
 import { LinkedRelativeModel, InviteCodeModel } from "../../models/relative";
 import {
+    appointmentWindowEnd,
     getAppointmentsForCitizenAsync,
+    startOfToday,
     toActivityDto,
     visibleActivitiesForCitizenAsync,
 } from "../../utils/helpers/citizenDataHelper";
@@ -27,7 +29,10 @@ citizenRoutes.use("*", requireSession);
 
 citizenRoutes.get("/appointments", async (c) => {
     const citizenUserId = c.get("user").id;
-    const appointments = await getAppointmentsForCitizenAsync(citizenUserId);
+    const appointments = await getAppointmentsForCitizenAsync(citizenUserId, {
+        from: startOfToday(),
+        to: appointmentWindowEnd(),
+    });
 
     return c.json(appointments);
 });
@@ -173,7 +178,7 @@ citizenRoutes.patch("/relatives/:relativeUserId/approve", async (c) => {
         .returning();
 
     if (!updated) {
-        return c.json({ error: "The request does not exist." }, 404);
+        return c.json({ error: "Anmodningen findes ikke." }, 404);
     }
 
     return c.json({ status: "approved" });
@@ -183,14 +188,25 @@ citizenRoutes.delete("/relatives/:relativeUserId", async (c) => {
     const citizenUserId = c.get("user").id;
     const relativeUserId = c.req.param("relativeUserId");
 
-    await dbClient
+    const [removed] = await dbClient
         .delete(relativeCitizen)
         .where(
             and(
                 eq(relativeCitizen.citizenUserId, citizenUserId),
                 eq(relativeCitizen.relativeUserId, relativeUserId),
+                eq(relativeCitizen.status, "pending"),
             ),
+        )
+        .returning();
+
+    if (!removed) {
+        return c.json(
+            {
+                error: "Anmodningen findes ikke, eller den pårørende er allerede godkendt.",
+            },
+            404,
         );
+    }
 
     return c.json({ status: "removed" });
 });
