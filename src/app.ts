@@ -3,6 +3,7 @@ import { cors } from "hono/cors";
 import { auth } from "./utils/auth";
 import activityRoutes from "./routes/adminRoutes/activityRoutes";
 import facilityRoutes from "./routes/adminRoutes/facilityRoutes";
+import sensorRoutes from "./routes/adminRoutes/sensorRoutes";
 import visitRoutes from "./routes/adminRoutes/visitRoutes";
 import citizenRoutes from "./routes/citizenRoutes/citizen";
 
@@ -29,6 +30,7 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/api/activities", activityRoutes);
 app.route("/api/facilities", facilityRoutes);
+app.route("/sensors", sensorRoutes);
 app.route("/api/visits", visitRoutes);
 app.route("/citizen", citizenRoutes);
 

@@ -63,7 +63,7 @@ export function connectMqtt(): MqttClient {
     });
 
     client.on('message', async (topic, message, packet) => {
-        // Optional: skip duplicated re-delivery
+        // skip duplicated re-delivery
         if (packet.dup) return;
         try {
             if (topic.includes('seniorsync/fallsensor/status')) {

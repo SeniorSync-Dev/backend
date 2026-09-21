@@ -6,7 +6,7 @@ export const statement = {
     member: ["create", "update", "delete"], // <-- Needed to assign/change a member's role
     invitation: ["create", "cancel"], // <-- Needed to invite new users into the organization
     activity: ["create", "update", "delete"], // <-- Needed to create, update and delete activities
-    alarm: ["read", "update"], // <-- Needed to create, update and delete alarms
+    sensor: ["read", "update"], // <-- Needed to create, update and delete alarms
 } as const;
 
 export const ac = createAccessControl(statement);
@@ -19,7 +19,7 @@ export const relative = ac.newRole({
 });
 export const employee = ac.newRole({
     project: ["create"],
-    alarm: ["read", "update"],
+    sensor: ["read", "update"],
 });
 export const servicePartner = ac.newRole({
     project: ["create"],
@@ -32,4 +32,5 @@ export const systemAdmin = ac.newRole({
     organization: ["create", "update", "delete", "share"],
     member: ["create", "update", "delete"],
     invitation: ["create", "cancel"],
+    sensor: ["read", "update"],
 });
