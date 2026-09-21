@@ -4,8 +4,6 @@ import { relativeCitizen } from "../../db/schemas";
 
 type RelativePermission = "canView" | "canBookActivities";
 
-// Looks up the relativeCitizen link and checks it's approved with the given
-// permission flag set - returns null if access should be denied.
 export async function getApprovedRelativeLinkAsync(
     relativeUserId: string,
     citizenUserId: string,
