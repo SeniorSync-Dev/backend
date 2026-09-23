@@ -6,6 +6,7 @@ import facilityRoutes from "./routes/adminRoutes/facilityRoutes";
 import sensorRoutes from "./routes/adminRoutes/sensorRoutes";
 import visitRoutes from "./routes/adminRoutes/visitRoutes";
 import citizenRoutes from "./routes/citizenRoutes/citizen";
+import sensorEventRoutes from "./routes/adminRoutes/sensorEventRoutes";
 
 const app = new Hono();
 
@@ -31,6 +32,7 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 app.route("/api/activities", activityRoutes);
 app.route("/api/facilities", facilityRoutes);
 app.route("/sensors", sensorRoutes);
+app.route("/sensor-events", sensorEventRoutes);
 app.route("/api/visits", visitRoutes);
 app.route("/citizen", citizenRoutes);
 
