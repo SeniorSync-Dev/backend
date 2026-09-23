@@ -68,6 +68,13 @@ export async function handleFallStatusAsync(statusChange: StatusChange): Promise
             status: "new",
             payload: JSON.stringify(statusChange),
             occurredAt: statusChange.timestamp,
+        })
+        .onConflictDoNothing({
+            target: [
+                sensorEvent.deviceId,
+                sensorEvent.eventType,
+                sensorEvent.occurredAt,
+            ],
         });
 }
 
