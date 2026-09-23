@@ -38,6 +38,7 @@ visitRoutes.get("/", async (c) => {
     const visits = await dbClient
         .select({
             id: careTask.id,
+            type: careTask.type,
             title: careTask.title,
             description: careTask.description,
             scheduledStart: careTask.scheduledStart,
@@ -55,7 +56,7 @@ visitRoutes.get("/", async (c) => {
         .leftJoin(employeeUser, eq(employee.userId, employeeUser.id))
         .where(
             and(
-                eq(careTask.type, "visit"),
+                inArray(careTask.type, ["visit", "call"]),
                 inArray(careTask.facilityId, facilityIds),
             ),
         )
@@ -123,7 +124,12 @@ visitRoutes.post("/", async (c) => {
         description,
         scheduledStart,
         scheduledEnd,
+        type,
     } = body;
+
+    // Kun fysiske besøg og skærmbesøg planlægges herfra. De øvrige care
+    // task-typer (medicin, hygiejne, …) hører til andre arbejdsgange.
+    const taskType = type === "call" ? "call" : "visit";
     if (!citizenUserId || !scheduledStart) {
         return c.json(
             { message: "citizenUserId og scheduledStart er påkrævet" },
@@ -174,8 +180,8 @@ visitRoutes.post("/", async (c) => {
             citizenUserId,
             assignedEmployeeId: assignedEmployeeId || null,
             facilityId: citizenLink.facilityId,
-            type: "visit",
-            title: title || "Besøg",
+            type: taskType,
+            title: title || (taskType === "call" ? "Skærmbesøg" : "Besøg"),
             description: description || null,
             scheduledStart: new Date(scheduledStart),
             scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : null,
@@ -224,7 +230,7 @@ visitRoutes.post("/:id/assign", async (c) => {
         .where(
             and(
                 eq(careTask.id, visitId),
-                eq(careTask.type, "visit"),
+                inArray(careTask.type, ["visit", "call"]),
                 inArray(careTask.facilityId, facilityIds),
                 isNull(careTask.assignedEmployeeId),
             ),

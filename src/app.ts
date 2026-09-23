@@ -5,6 +5,7 @@ import activityRoutes from "./routes/adminRoutes/activityRoutes";
 import facilityRoutes from "./routes/adminRoutes/facilityRoutes";
 import visitRoutes from "./routes/adminRoutes/visitRoutes";
 import citizenRoutes from "./routes/citizenRoutes/citizen";
+import screenVisitRoutes from "./routes/screenVisitRoutes/screenVisit";
 
 const app = new Hono();
 
@@ -31,6 +32,7 @@ app.route("/api/activities", activityRoutes);
 app.route("/api/facilities", facilityRoutes);
 app.route("/api/visits", visitRoutes);
 app.route("/citizen", citizenRoutes);
+app.route("/screen-visits", screenVisitRoutes);
 
 app.get("/", (c) => c.text("Hello Hono!"));
 

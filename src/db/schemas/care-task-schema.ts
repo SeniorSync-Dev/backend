@@ -43,6 +43,9 @@ export const careTask = pgTable("care_tasks", {
     scheduledStart: timestamp("scheduled_start").notNull(),
     scheduledEnd: timestamp("scheduled_end"),
     status: careTaskStatusEnum("status").default("planned").notNull(),
+    // Cloudflare RealtimeKit-mødet. Kun sat på skærmbesøg (type "call"), og
+    // først når nogen faktisk deltager — aflyste besøg får aldrig et møde.
+    meetingId: text("meeting_id"),
     // Optional: e.g. 1-5
     priority: integer("priority"),
     createdByUserId: text("created_by_user_id")
