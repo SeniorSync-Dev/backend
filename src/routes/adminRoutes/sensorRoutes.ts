@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { and, asc, count, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
+import { getClient } from "../../utils/mqttService";
 import { citizen, member, sensorDevice, user } from "../../db/schemas";
 import {
     requireSession,
@@ -185,6 +186,14 @@ sensorRoutes.patch("/:id/assignment", async (c) => {
 
     if (!updatedSensor) {
         return c.json({ message: "Sensor not found" }, 404);
+    }
+
+    const mqttClient = getClient();
+    if (mqttClient) {
+        mqttClient.publish(
+            updatedSensor.mqttTopic,
+            "OK",
+        );
     }
 
     return c.json(updatedSensor);
