@@ -37,6 +37,63 @@ citizenRoutes.get("/appointments", async (c) => {
     return c.json(appointments);
 });
 
+citizenRoutes.post("/visits", async (c) => {
+    const citizenUserId = c.get("user").id;
+    const body = await c.req.json();
+    const { title, description, scheduledStart, scheduledEnd } = body;
+
+    if (!scheduledStart) {
+        return c.json({ error: "Starttidspunkt er påkrævet." }, 400);
+    }
+
+    const [facilityLink] = await dbClient
+        .select({ facilityId: citizenFacilities.facilityId })
+        .from(citizenFacilities)
+        .where(
+            and(
+                eq(citizenFacilities.citizenUserId, citizenUserId),
+                or(
+                    isNull(citizenFacilities.endDate),
+                    gte(citizenFacilities.endDate, sql`current_date`),
+                ),
+            ),
+        )
+        .orderBy(sql`${citizenFacilities.isPrimary} desc`)
+        .limit(1);
+
+    if (!facilityLink) {
+        return c.json(
+            { error: "Du er ikke tilknyttet et plejehjem endnu." },
+            400,
+        );
+    }
+
+    const [created] = await dbClient
+        .insert(careTask)
+        .values({
+            citizenUserId,
+            facilityId: facilityLink.facilityId,
+            type: "visit",
+            title: title || "Besøg",
+            description: description || null,
+            scheduledStart: new Date(scheduledStart),
+            scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : null,
+            createdByUserId: citizenUserId,
+        })
+        .returning();
+
+    const appointment: AppointmentModel = {
+        id: created.id,
+        type: "home_visit",
+        title: created.title,
+        description: created.description ?? undefined,
+        start: created.scheduledStart.toISOString(),
+        end: created.scheduledEnd?.toISOString(),
+    };
+
+    return c.json(appointment, 201);
+});
+
 citizenRoutes.get("/activities", async (c) => {
     const citizenUserId = c.get("user").id;
     const rows = await visibleActivitiesForCitizenAsync(citizenUserId);
@@ -65,7 +122,10 @@ citizenRoutes.post("/activities/:id/signup", async (c) => {
         return c.json(toActivityDto(current));
     }
 
-    if (current.capacity !== null && current.registeredCount >= current.capacity) {
+    if (
+        current.capacity !== null &&
+        current.registeredCount >= current.capacity
+    ) {
         return c.json({ error: "Der er ingen ledige pladser." }, 409);
     }
 

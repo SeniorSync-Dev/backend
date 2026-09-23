@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { alias } from "drizzle-orm/pg-core";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import {
     careTask,
@@ -184,6 +184,61 @@ visitRoutes.post("/", async (c) => {
         .returning();
 
     return c.json(created, 201);
+});
+
+visitRoutes.post("/:id/assign", async (c) => {
+    const session = await auth.api.getSession({ headers: c.req.raw.headers });
+    if (!session) return c.json({ message: "Unauthorized" }, 401);
+
+    const organizationId = session.session.activeOrganizationId;
+    if (!organizationId)
+        return c.json({ message: "No active organization" }, 400);
+
+    const [member_] = await dbClient
+        .select({ role: member.role })
+        .from(member)
+        .where(
+            and(
+                eq(member.userId, session.user.id),
+                eq(member.organizationId, organizationId),
+            ),
+        )
+        .limit(1);
+    if (
+        !member_ ||
+        (member_.role !== "employee" && member_.role !== "systemAdmin")
+    ) {
+        return c.json({ message: "Kun medarbejdere kan tildele besøg" }, 403);
+    }
+
+    const visitId = c.req.param("id");
+    const facilityIds = await getOrganizationFacilityIds(organizationId);
+    if (facilityIds.length === 0)
+        return c.json({ message: "Besøget findes ikke" }, 404);
+
+    const employeeId = await ensureEmployeeRecordAsync(session.user.id);
+
+    const [updated] = await dbClient
+        .update(careTask)
+        .set({ assignedEmployeeId: employeeId })
+        .where(
+            and(
+                eq(careTask.id, visitId),
+                eq(careTask.type, "visit"),
+                inArray(careTask.facilityId, facilityIds),
+                isNull(careTask.assignedEmployeeId),
+            ),
+        )
+        .returning();
+
+    if (!updated) {
+        return c.json(
+            { message: "Besøget findes ikke eller er allerede tildelt" },
+            409,
+        );
+    }
+
+    return c.json(updated);
 });
 
 export default visitRoutes;
