@@ -142,7 +142,9 @@ sensorEventRoutes.patch("/:id/acknowledge", async (c) => {
     }
 
     const employeeId = await getCurrentEmployeeId(c.get("user").id);
-    if (!employeeId) {
+    const employeeName = await getCurrentEmployeeName(c.get("user").id);
+
+    if (!employeeId || !employeeName) {
         return c.json({ message: "Current user is not an employee" }, 400);
     }
 
@@ -152,6 +154,7 @@ sensorEventRoutes.patch("/:id/acknowledge", async (c) => {
             status: "acknowledged",
             acknowledgedAt: new Date(),
             acknowledgedByEmployeeId: employeeId,
+            acknowledgedByEmployeeName: employeeName,
         })
         .where(
             and(
@@ -186,7 +189,9 @@ sensorEventRoutes.patch("/:id/resolve", async (c) => {
     }
 
     const employeeId = await getCurrentEmployeeId(c.get("user").id);
-    if (!employeeId) {
+    const employeeName = await getCurrentEmployeeName(c.get("user").id);
+
+    if (!employeeId || !employeeName) {
         return c.json({ message: "Current user is not an employee" }, 400);
     }
 
@@ -205,6 +210,7 @@ sensorEventRoutes.patch("/:id/resolve", async (c) => {
         .set({
             status: "resolved",
             resolvedAt: new Date(),
+            resolvedByEmployeeName: employeeName,
             resolvedByEmployeeId: employeeId,
             ...(body.resolutionNotes !== undefined && {
                 resolutionNotes: body.resolutionNotes,
@@ -244,6 +250,16 @@ async function getCurrentEmployeeId(userId: string): Promise<string | undefined>
         .limit(1);
 
     return currentEmployee?.id;
+}
+
+async function getCurrentEmployeeName(userId: string): Promise<string | undefined> {
+    const [currentEmployee] = await dbClient
+        .select({ name: user.name })
+        .from(user)
+        .where(eq(user.id, userId))
+        .limit(1);
+
+    return currentEmployee?.name;
 }
 
 function parsePositiveInteger(

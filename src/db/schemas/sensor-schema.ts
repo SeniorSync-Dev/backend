@@ -99,10 +99,12 @@ export const sensorEvent = pgTable(
         acknowledgedByEmployeeId: uuid("acknowledged_by_employee_id").references(
             () => employee.id,
         ),
+        acknowledgedByEmployeeName: text("acknowledged_by_employee_name"),
         resolvedAt: timestamp("resolved_at"),
         resolvedByEmployeeId: uuid("resolved_by_employee_id").references(
             () => employee.id,
         ),
+        resolvedByEmployeeName: text("resolved_by_employee_name"),
         resolutionNotes: text("resolution_notes"),
         createdAt: timestamp("created_at").defaultNow().notNull(),
     },
