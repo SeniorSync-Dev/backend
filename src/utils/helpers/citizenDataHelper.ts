@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import {
     activity,
@@ -47,6 +47,23 @@ export function appointmentWindowEnd() {
     return date;
 }
 
+async function completePastVisitsAsync(citizenUserId: string) {
+    await dbClient
+        .update(careTask)
+        .set({
+            status: "completed",
+            completedAt: sql`${careTask.scheduledEnd}`,
+        })
+        .where(
+            and(
+                eq(careTask.citizenUserId, citizenUserId),
+                eq(careTask.type, "visit"),
+                inArray(careTask.status, ["planned", "in_progress"]),
+                lt(careTask.scheduledEnd, new Date()),
+            ),
+        );
+}
+
 export async function getAppointmentsForCitizenAsync(
     citizenUserId: string,
     {
@@ -55,6 +72,8 @@ export async function getAppointmentsForCitizenAsync(
         includeCompleted = false,
     }: { from?: Date; to?: Date; includeCompleted?: boolean } = {},
 ) {
+    await completePastVisitsAsync(citizenUserId);
+
     const tasks = await dbClient
         .select({
             id: careTask.id,

@@ -216,49 +216,6 @@ relativeRoutes.patch("/citizens/:citizenId/visits/:visitId", async (c) => {
     return c.json(appointments);
 });
 
-relativeRoutes.patch(
-    "/citizens/:citizenId/visits/:visitId/complete",
-    async (c) => {
-        const relativeUserId = c.get("user").id;
-        const citizenId = c.req.param("citizenId");
-        const visitId = c.req.param("visitId");
-
-        const link = await getApprovedRelativeLinkAsync(
-            relativeUserId,
-            citizenId,
-            "canView",
-        );
-        if (!link)
-            return c.json({ error: "Du har ikke adgang til denne borger." }, 403);
-
-        const [updated] = await dbClient
-            .update(careTask)
-            .set({ status: "completed", completedAt: new Date() })
-            .where(
-                and(
-                    eq(careTask.id, visitId),
-                    eq(careTask.citizenUserId, citizenId),
-                    eq(careTask.type, "visit"),
-                    eq(careTask.createdByUserId, relativeUserId),
-                ),
-            )
-            .returning();
-
-        if (!updated) {
-            return c.json(
-                { error: "Besøget findes ikke, eller du kan ikke ændre det." },
-                404,
-            );
-        }
-
-        const appointments = await getAppointmentsForCitizenAsync(citizenId, {
-            from: startOfToday(),
-            includeCompleted: true,
-        });
-        return c.json(appointments);
-    },
-);
-
 relativeRoutes.delete("/citizens/:citizenId/visits/:visitId", async (c) => {
     const relativeUserId = c.get("user").id;
     const citizenId = c.req.param("citizenId");
