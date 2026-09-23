@@ -100,8 +100,10 @@ sensorEventRoutes.get("/", async (c) => {
                 payload: sensorEvent.payload,
                 acknowledgedAt: sensorEvent.acknowledgedAt,
                 acknowledgedByEmployeeId: sensorEvent.acknowledgedByEmployeeId,
+                acknowledgedByEmployeeName: sensorEvent.acknowledgedByEmployeeName,
                 resolvedAt: sensorEvent.resolvedAt,
                 resolvedByEmployeeId: sensorEvent.resolvedByEmployeeId,
+                resolvedByEmployeeName: sensorEvent.resolvedByEmployeeName,
                 resolutionNotes: sensorEvent.resolutionNotes,
                 createdAt: sensorEvent.createdAt,
             })
