@@ -12,10 +12,11 @@ import {
     relativeCitizen,
     user,
 } from "../../db/schemas";
+import { requireSession } from "../../middleware/require-session";
 import {
-    requireSession,
-    type SessionVariables,
-} from "../../middleware/require-session";
+    requireRelative,
+    type RelativeVariables,
+} from "../../middleware/require-relative";
 import { getApprovedRelativeLinkAsync } from "../../utils/helpers/relativeAccessHelper";
 import {
     getAppointmentsForCitizenAsync,
@@ -28,12 +29,13 @@ import { LinkedCitizenModel } from "../../models/relative";
 const UUID_PATTERN =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const relativeRoutes = new Hono<{ Variables: SessionVariables }>();
+const relativeRoutes = new Hono<{ Variables: RelativeVariables }>();
 
 relativeRoutes.use("*", requireSession);
+relativeRoutes.use("/citizens/*", requireRelative);
 
 relativeRoutes.get("/citizens", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
 
     const links = await dbClient
         .select({
@@ -89,7 +91,7 @@ relativeRoutes.get("/citizens", async (c) => {
 });
 
 relativeRoutes.delete("/citizens/:citizenId", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
 
     const [removed] = await dbClient
@@ -110,7 +112,7 @@ relativeRoutes.delete("/citizens/:citizenId", async (c) => {
 });
 
 relativeRoutes.get("/citizens/:citizenId/appointments", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
@@ -124,7 +126,7 @@ relativeRoutes.get("/citizens/:citizenId/appointments", async (c) => {
 });
 
 relativeRoutes.post("/citizens/:citizenId/visits", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
@@ -164,7 +166,7 @@ relativeRoutes.post("/citizens/:citizenId/visits", async (c) => {
 });
 
 relativeRoutes.patch("/citizens/:citizenId/visits/:visitId", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
     const visitId = c.req.param("visitId");
 
@@ -217,7 +219,7 @@ relativeRoutes.patch("/citizens/:citizenId/visits/:visitId", async (c) => {
 });
 
 relativeRoutes.delete("/citizens/:citizenId/visits/:visitId", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
     const visitId = c.req.param("visitId");
 
@@ -249,7 +251,7 @@ relativeRoutes.delete("/citizens/:citizenId/visits/:visitId", async (c) => {
 });
 
 relativeRoutes.get("/citizens/:citizenId/activities", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canView");
@@ -260,7 +262,7 @@ relativeRoutes.get("/citizens/:citizenId/activities", async (c) => {
 });
 
 relativeRoutes.post("/citizens/:citizenId/activities/:activityId/signup", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
     const activityId = c.req.param("activityId");
 
@@ -312,7 +314,7 @@ relativeRoutes.post("/citizens/:citizenId/activities/:activityId/signup", async 
 });
 
 relativeRoutes.delete("/citizens/:citizenId/activities/:activityId/signup", async (c) => {
-    const relativeUserId = c.get("user").id;
+    const relativeUserId = c.get("relativeUserId");
     const citizenId = c.req.param("citizenId");
     const activityId = c.req.param("activityId");
 
@@ -389,6 +391,8 @@ relativeRoutes.get("/invitations/:code", async (c) => {
 });
 
 relativeRoutes.post("/invitations/redeem", async (c) => {
+    // Ligger uden for requireRelative: rækken i relative-tabellen oprettes
+    // først her, så id'et læses direkte fra Better Auth-sessionen.
     const relativeUserId = c.get("user").id;
     const { code, relationshipType } = await c.req.json();
 

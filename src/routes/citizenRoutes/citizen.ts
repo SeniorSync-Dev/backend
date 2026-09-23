@@ -1,12 +1,21 @@
 import { Hono } from "hono";
 import { randomBytes } from "crypto";
-import { and, desc, eq, gte } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
-import { activitySignup, citizenInviteCode, relativeCitizen, user } from "../../db/schemas";
 import {
-    requireSession,
-    type SessionVariables,
-} from "../../middleware/require-session";
+    activitySignup,
+    careTask,
+    citizenFacilities,
+    citizenInviteCode,
+    relativeCitizen,
+    user,
+} from "../../db/schemas";
+import { AppointmentModel } from "../../models/appointment";
+import { requireSession } from "../../middleware/require-session";
+import {
+    requireCitizen,
+    type CitizenVariables,
+} from "../../middleware/require-citizen";
 import { LinkedRelativeModel, InviteCodeModel } from "../../models/relative";
 import {
     appointmentWindowEnd,
@@ -23,12 +32,13 @@ const INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I t
 const INVITE_CODE_LENGTH = 6;
 const INVITE_CODE_VALID_DAYS = 7;
 
-const citizenRoutes = new Hono<{ Variables: SessionVariables }>();
+const citizenRoutes = new Hono<{ Variables: CitizenVariables }>();
 
 citizenRoutes.use("*", requireSession);
+citizenRoutes.use("*", requireCitizen);
 
 citizenRoutes.get("/appointments", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
     const appointments = await getAppointmentsForCitizenAsync(citizenUserId, {
         from: startOfToday(),
         to: appointmentWindowEnd(),
@@ -38,7 +48,7 @@ citizenRoutes.get("/appointments", async (c) => {
 });
 
 citizenRoutes.post("/visits", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
     const body = await c.req.json();
     const { title, description, scheduledStart, scheduledEnd } = body;
 
@@ -95,14 +105,14 @@ citizenRoutes.post("/visits", async (c) => {
 });
 
 citizenRoutes.get("/activities", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
     const rows = await visibleActivitiesForCitizenAsync(citizenUserId);
 
     return c.json(rows.map(toActivityDto));
 });
 
 citizenRoutes.post("/activities/:id/signup", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
     const activityId = c.req.param("id");
 
     if (!UUID_PATTERN.test(activityId)) {
@@ -163,7 +173,7 @@ citizenRoutes.post("/activities/:id/signup", async (c) => {
 });
 
 citizenRoutes.delete("/activities/:id/signup", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
     const activityId = c.req.param("id");
 
     if (!UUID_PATTERN.test(activityId)) {
@@ -198,7 +208,7 @@ citizenRoutes.delete("/activities/:id/signup", async (c) => {
 });
 
 citizenRoutes.get("/relatives", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
 
     const rows = await dbClient
         .select({
@@ -223,7 +233,7 @@ citizenRoutes.get("/relatives", async (c) => {
 });
 
 citizenRoutes.patch("/relatives/:relativeUserId/approve", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
     const relativeUserId = c.req.param("relativeUserId");
 
     const [updated] = await dbClient
@@ -245,7 +255,7 @@ citizenRoutes.patch("/relatives/:relativeUserId/approve", async (c) => {
 });
 
 citizenRoutes.delete("/relatives/:relativeUserId", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
     const relativeUserId = c.req.param("relativeUserId");
 
     const [removed] = await dbClient
@@ -272,7 +282,7 @@ citizenRoutes.delete("/relatives/:relativeUserId", async (c) => {
 });
 
 citizenRoutes.get("/invite-code", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
 
     const [current] = await dbClient
         .select({ code: citizenInviteCode.code, expiresAt: citizenInviteCode.expiresAt })
@@ -299,7 +309,7 @@ citizenRoutes.get("/invite-code", async (c) => {
 });
 
 citizenRoutes.post("/invite-code", async (c) => {
-    const citizenUserId = c.get("user").id;
+    const citizenUserId = c.get("citizenUserId");
 
     await dbClient
         .delete(citizenInviteCode)
