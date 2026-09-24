@@ -21,9 +21,7 @@ import {
     settleEndedScreenVisitsAsync,
 } from "../../utils/helpers/screenVisitHelper";
 import { ActivityModel } from "../../models/activity";
-
-const UUID_PATTERN =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "../../utils/uuid";
 
 const citizenRoutes = new Hono<{ Variables: SessionVariables }>();
 
@@ -194,7 +192,7 @@ citizenRoutes.post("/activities/:id/signup", async (c) => {
     const citizenUserId = c.get("user").id;
     const activityId = c.req.param("id");
 
-    if (!UUID_PATTERN.test(activityId)) {
+    if (!isUuid(activityId)) {
         return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 
@@ -249,7 +247,7 @@ citizenRoutes.delete("/activities/:id/signup", async (c) => {
     const citizenUserId = c.get("user").id;
     const activityId = c.req.param("id");
 
-    if (!UUID_PATTERN.test(activityId)) {
+    if (!isUuid(activityId)) {
         return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 

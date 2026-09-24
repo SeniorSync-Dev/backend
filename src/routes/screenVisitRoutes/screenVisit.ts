@@ -14,9 +14,7 @@ import {
     addParticipantAsync,
     createMeetingAsync,
 } from "../../utils/realtimeKit";
-
-const UUID_PATTERN =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "../../utils/uuid";
 
 const screenVisitRoutes = new Hono<{ Variables: SessionVariables }>();
 
@@ -26,7 +24,7 @@ screenVisitRoutes.post("/:id/join", async (c) => {
     const user = c.get("user");
     const careTaskId = c.req.param("id");
 
-    if (!UUID_PATTERN.test(careTaskId)) {
+    if (!isUuid(careTaskId)) {
         return c.json({ error: "Skærmbesøget findes ikke." }, 404);
     }
 
