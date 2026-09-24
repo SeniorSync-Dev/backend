@@ -9,6 +9,7 @@ interface AppointmentModel {
     end?: string;
     location?: string;
     staffName?: string;
+    canJoin?: boolean;
 }
 
 export type { AppointmentType, AppointmentModel };

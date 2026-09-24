@@ -1,8 +1,40 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import { careTask, employee, relativeCitizen } from "../../db/schemas";
 
 export type ScreenVisitRole = "citizen" | "employee" | "relative";
+
+// Man kan gå ind et kvarter før aftalt tid, så der er ro til at tjekke kamera
+// og mikrofon. Og en halv time efter sluttidspunktet, så en samtale der
+// afbrydes kan genoptages — uden det forsvinder knappen i samme sekund
+// besøget er slut.
+const OPENS_MINUTES_BEFORE = 15;
+const CLOSES_MINUTES_AFTER = 30;
+
+const MINUTE_MS = 60_000;
+
+export type JoinWindowState = "early" | "open" | "over";
+
+export function joinWindowState(
+    scheduledStart: Date,
+    scheduledEnd: Date | null,
+    now = new Date(),
+): JoinWindowState {
+    const opensAt = scheduledStart.getTime() - OPENS_MINUTES_BEFORE * MINUTE_MS;
+    const closesAt =
+        (scheduledEnd ?? scheduledStart).getTime() +
+        CLOSES_MINUTES_AFTER * MINUTE_MS;
+
+    if (now.getTime() < opensAt) return "early";
+    if (now.getTime() > closesAt) return "over";
+    return "open";
+}
+
+// Hvor langt tilbage et afsluttet skærmbesøg stadig skal med i en liste, så
+// knappen ikke når at forsvinde mens vinduet er åbent.
+export function screenVisitListCutoff(now = new Date()) {
+    return new Date(now.getTime() - CLOSES_MINUTES_AFTER * MINUTE_MS);
+}
 
 export async function findJoinableScreenVisitAsync(
     userId: string,
@@ -15,6 +47,8 @@ export async function findJoinableScreenVisitAsync(
             citizenUserId: careTask.citizenUserId,
             assignedEmployeeId: careTask.assignedEmployeeId,
             meetingId: careTask.meetingId,
+            scheduledStart: careTask.scheduledStart,
+            scheduledEnd: careTask.scheduledEnd,
         })
         .from(careTask)
         .where(
@@ -62,4 +96,33 @@ export async function findJoinableScreenVisitAsync(
     if (link) return { task, role: "relative" as ScreenVisitRole };
 
     return null;
+}
+
+// Når deltagelsesvinduet er lukket, er skærmbesøget forbi. Uden det her ville
+// det stå som "Planlagt" for evigt i personalets liste.
+//
+// meeting_id sættes først når den første deltager går ind, så den fortæller om
+// samtalen rent faktisk fandt sted. Var der ingen, er "udeblevet" sandheden —
+// ikke "gennemført".
+export async function settleEndedScreenVisitsAsync(now = new Date()) {
+    const closed = screenVisitListCutoff(now).toISOString();
+
+    const ended = and(
+        eq(careTask.type, "call"),
+        inArray(careTask.status, ["planned", "in_progress"]),
+        sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart}) < ${closed}::timestamp`,
+    );
+
+    await dbClient
+        .update(careTask)
+        .set({
+            status: "completed",
+            completedAt: sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart})`,
+        })
+        .where(and(ended, isNotNull(careTask.meetingId)));
+
+    await dbClient
+        .update(careTask)
+        .set({ status: "missed" })
+        .where(and(ended, isNull(careTask.meetingId)));
 }

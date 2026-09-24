@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { and, asc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import {
     activity,
@@ -15,6 +15,11 @@ import {
     type SessionVariables,
 } from "../../middleware/require-session";
 import { AppointmentModel } from "../../models/appointment";
+import {
+    joinWindowState,
+    screenVisitListCutoff,
+    settleEndedScreenVisitsAsync,
+} from "../../utils/helpers/screenVisitHelper";
 import { ActivityModel } from "../../models/activity";
 
 const UUID_PATTERN =
@@ -24,9 +29,19 @@ const citizenRoutes = new Hono<{ Variables: SessionVariables }>();
 
 citizenRoutes.use("*", requireSession);
 
+// Tidspunkter gemmes som UTC i en timestamp-kolonne uden tidszone. Sammenligner
+// vi med et JS-Date inde i en rå sql-blok, kender Drizzle ikke typen, og
+// driveren sender lokal tid med offset — som Postgres kasserer. Det forskyder
+// sammenligningen med tidszonens offset, så grænsen bindes eksplicit som UTC.
+function endsAtOrAfter(cutoff: Date) {
+    return sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart}) >= ${cutoff.toISOString()}::timestamp`;
+}
+
 citizenRoutes.get("/appointments", async (c) => {
     const citizenUserId = c.get("user").id;
     const now = new Date();
+
+    await settleEndedScreenVisitsAsync(now);
 
     const tasks = await dbClient
         .select({
@@ -47,9 +62,12 @@ citizenRoutes.get("/appointments", async (c) => {
             and(
                 eq(careTask.citizenUserId, citizenUserId),
                 inArray(careTask.status, ["planned", "in_progress"]),
-                gte(
-                    sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart})`,
-                    now,
+                or(
+                    and(
+                        eq(careTask.type, "call"),
+                        endsAtOrAfter(screenVisitListCutoff(now)),
+                    ),
+                    and(ne(careTask.type, "call"), endsAtOrAfter(now)),
                 ),
             ),
         )
@@ -87,6 +105,10 @@ citizenRoutes.get("/appointments", async (c) => {
                 end: task.end?.toISOString(),
                 location: task.facilityName ?? undefined,
                 staffName: task.staffName ?? undefined,
+                canJoin:
+                    task.type === "call"
+                        ? joinWindowState(task.start, task.end, now) === "open"
+                        : undefined,
             }),
         ),
         ...signups.map(

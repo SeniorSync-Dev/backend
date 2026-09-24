@@ -13,6 +13,10 @@ import {
 } from "../../db/schemas";
 import { auth } from "../../utils/auth";
 import { ensureEmployeeRecordAsync } from "../../utils/helpers/employeeHelper";
+import {
+    joinWindowState,
+    settleEndedScreenVisitsAsync,
+} from "../../utils/helpers/screenVisitHelper";
 
 const visitRoutes = new Hono();
 
@@ -34,6 +38,8 @@ visitRoutes.get("/", async (c) => {
 
     const facilityIds = await getOrganizationFacilityIds(organizationId);
     if (facilityIds.length === 0) return c.json([]);
+
+    await settleEndedScreenVisitsAsync();
 
     const visits = await dbClient
         .select({
@@ -62,7 +68,21 @@ visitRoutes.get("/", async (c) => {
         )
         .orderBy(asc(careTask.scheduledStart));
 
-    return c.json(visits);
+    const now = new Date();
+
+    return c.json(
+        visits.map((visit) => ({
+            ...visit,
+            canJoin:
+                visit.type === "call"
+                    ? joinWindowState(
+                          visit.scheduledStart,
+                          visit.scheduledEnd,
+                          now,
+                      ) === "open"
+                    : undefined,
+        })),
+    );
 });
 
 visitRoutes.get("/options", async (c) => {

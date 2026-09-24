@@ -1,18 +1,12 @@
-// Alt der taler med Cloudflare RealtimeKit ligger her, så resten af koden kun
-// kender til "opret et møde" og "giv mig en token".
-// Dokumentation: https://developers.cloudflare.com/realtime/realtimekit/
-
 const API_BASE = "https://api.cloudflare.com/client/v4";
-
-// Begge parter i et skærmbesøg er ligestillede: de kommer direkte ind og har
-// kamera og mikrofon. "guest" ville kræve at nogen lukker dem ind, og "host"
-// giver moderator-rettigheder der ikke er nogen at bruge på i en 1:1-samtale.
 const PRESET = "group_call_participant";
 
-type CloudflareEnvelope<T> = {
+// RealtimeKit pakker svaret i "data" 
+// Ikke i "result", som resten af Cloudflares client/v4-API bruger.
+type RealtimeKitEnvelope<T> = {
     success: boolean;
-    errors: Array<{ code: number; message: string }>;
-    result: T;
+    errors?: Array<{ code: number; message: string }>;
+    data: T;
 };
 
 function config() {
@@ -44,18 +38,16 @@ async function requestAsync<T>(path: string, body: unknown): Promise<T> {
         },
     );
 
-    const payload = (await response.json()) as CloudflareEnvelope<T>;
+    const payload = (await response.json()) as RealtimeKitEnvelope<T>;
 
     if (!response.ok || !payload.success) {
-        // Cloudflares fejltekster er ikke noget vi viser en borger, så de
-        // bliver her og bliver til en generisk 502 længere oppe.
         const reason =
             payload.errors?.map((error) => error.message).join(", ") ??
             `HTTP ${response.status}`;
         throw new Error(`Cloudflare RealtimeKit svarede med fejl: ${reason}`);
     }
 
-    return payload.result;
+    return payload.data;
 }
 
 export async function createMeetingAsync(title: string) {

@@ -6,7 +6,10 @@ import {
     requireSession,
     type SessionVariables,
 } from "../../middleware/require-session";
-import { findJoinableScreenVisitAsync } from "../../utils/helpers/screenVisitHelper";
+import {
+    findJoinableScreenVisitAsync,
+    joinWindowState,
+} from "../../utils/helpers/screenVisitHelper";
 import {
     addParticipantAsync,
     createMeetingAsync,
@@ -36,6 +39,23 @@ screenVisitRoutes.post("/:id/join", async (c) => {
         );
     }
 
+    const window = joinWindowState(
+        visit.task.scheduledStart,
+        visit.task.scheduledEnd,
+    );
+
+    if (window !== "open") {
+        return c.json(
+            {
+                error:
+                    window === "early"
+                        ? "Skærmbesøget åbner et kvarter før aftalt tid."
+                        : "Skærmbesøget er afsluttet.",
+            },
+            409,
+        );
+    }
+
     try {
         const meetingId =
             visit.task.meetingId ?? (await claimMeetingAsync(visit.task));
@@ -46,7 +66,9 @@ screenVisitRoutes.post("/:id/join", async (c) => {
         });
 
         return c.json({ token, role: visit.role });
-    } catch {
+    } catch (cause) {
+        console.error(`Skærmbesøg ${careTaskId} kunne ikke startes:`, cause);
+
         return c.json(
             { error: "Vi kunne ikke starte skærmbesøget. Prøv igen." },
             502,
