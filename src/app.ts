@@ -3,8 +3,10 @@ import { cors } from "hono/cors";
 import { auth } from "./utils/auth";
 import activityRoutes from "./routes/adminRoutes/activityRoutes";
 import facilityRoutes from "./routes/adminRoutes/facilityRoutes";
+import sensorRoutes from "./routes/adminRoutes/sensorRoutes";
 import visitRoutes from "./routes/adminRoutes/visitRoutes";
 import citizenRoutes from "./routes/citizenRoutes/citizen";
+import sensorEventRoutes from "./routes/adminRoutes/sensorEventRoutes";
 
 const app = new Hono();
 
@@ -13,7 +15,7 @@ app.use(
     cors({
         origin: ["http://localhost:3001", "http://localhost:3000"],
         allowHeaders: ["Content-Type", "Authorization"],
-        allowMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE"],
+        allowMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE", "PATCH"],
         exposeHeaders: ["Content-Length"],
         maxAge: 600,
         credentials: true,
@@ -29,6 +31,8 @@ app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
 
 app.route("/api/activities", activityRoutes);
 app.route("/api/facilities", facilityRoutes);
+app.route("/sensors", sensorRoutes);
+app.route("/sensor-events", sensorEventRoutes);
 app.route("/api/visits", visitRoutes);
 app.route("/citizen", citizenRoutes);
 

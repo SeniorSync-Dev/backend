@@ -30,7 +30,6 @@ import {
 } from "./medication-schema";
 import {
     sensorDevice,
-    citizenSensorDevice,
     sensorEvent,
 } from "./sensor-schema";
 
@@ -61,7 +60,6 @@ export const relations = defineRelations(
         medicationSchedule,
         medicationEvent,
         sensorDevice,
-        citizenSensorDevice,
         sensorEvent,
     },
     (r) => ({
@@ -218,10 +216,8 @@ export const relations = defineRelations(
                 to: r.medicationEvent.citizenUserId,
             }),
             sensorDevices: r.many.sensorDevice({
-                from: r.citizen.userId.through(
-                    r.citizenSensorDevice.citizenUserId,
-                ),
-                to: r.sensorDevice.id.through(r.citizenSensorDevice.deviceId),
+                from: r.citizen.userId,
+                to: r.sensorDevice.citizenUserId,
             }),
             sensorEvents: r.many.sensorEvent({
                 from: r.citizen.userId,
@@ -479,27 +475,14 @@ export const relations = defineRelations(
             }),
         },
         sensorDevice: {
-            citizens: r.many.citizen({
-                from: r.sensorDevice.id.through(r.citizenSensorDevice.deviceId),
-                to: r.citizen.userId.through(
-                    r.citizenSensorDevice.citizenUserId,
-                ),
+            citizen: r.one.citizen({
+                from: r.sensorDevice.citizenUserId,
+                to: r.citizen.userId,
+                optional: true,
             }),
             events: r.many.sensorEvent({
                 from: r.sensorDevice.id,
                 to: r.sensorEvent.deviceId,
-            }),
-        },
-        citizenSensorDevice: {
-            citizen: r.one.citizen({
-                from: r.citizenSensorDevice.citizenUserId,
-                to: r.citizen.userId,
-                optional: false,
-            }),
-            device: r.one.sensorDevice({
-                from: r.citizenSensorDevice.deviceId,
-                to: r.sensorDevice.id,
-                optional: false,
             }),
         },
         sensorEvent: {
