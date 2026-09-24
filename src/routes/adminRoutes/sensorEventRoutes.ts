@@ -13,6 +13,7 @@ import {
     type SessionVariables,
 } from "../../middleware/require-session";
 import { hasPermission } from "../../utils/helpers/permissionHelper";
+import { getClient } from "../../utils/mqttService";
 
 const sensorEventRoutes = new Hono<{ Variables: SessionVariables }>();
 
@@ -232,6 +233,19 @@ sensorEventRoutes.patch("/:id/resolve", async (c) => {
             { message: "Sensor event not found or cannot be resolved" },
             404,
         );
+    }
+
+    const mqttClient = getClient();
+    const device = await dbClient
+        .select({ serialNumber: sensorDevice.serialNumber })
+        .from(sensorDevice)
+        .where(eq(sensorDevice.id, updatedEvent.deviceId))
+        .limit(1)
+        .then((rows) => rows[0]);
+
+    if (mqttClient && device)
+    {
+        mqttClient.publish(`seniorsync/fallsensor/reset/${device.serialNumber}`, "RESOLVED", { qos: 2, retain: false });
     }
 
     return c.json(updatedEvent);
