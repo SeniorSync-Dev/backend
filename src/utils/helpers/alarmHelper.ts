@@ -64,7 +64,7 @@ export async function handleFallStatusAsync(statusChange: StatusChange): Promise
             deviceId: device.id,
             citizenUserId: device.citizenUserId,
             eventType: "fall_detected",
-            severity: "critical",
+            severity: "emergency",
             status: "new",
             payload: JSON.stringify(statusChange),
             occurredAt: statusChange.timestamp,
