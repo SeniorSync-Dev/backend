@@ -5,6 +5,7 @@ import {
     session,
     citizen,
     citizenFacilities,
+    serviceProviderCompanyStaff,
 } from "../../db/schemas";
 import { and, eq, InferSelectModel, isNotNull } from "drizzle-orm";
 
@@ -85,4 +86,14 @@ export async function linkCitizenToFacilityAsync(
         relationType: "resident",
         isPrimary: true,
     });
+}
+
+export async function linkServiceProviderCompanyStaffAsync(
+    userId: string,
+    companyId: string,
+): Promise<void> {
+    await dbClient
+        .insert(serviceProviderCompanyStaff)
+        .values({ userId, companyId })
+        .onConflictDoNothing();
 }

@@ -20,6 +20,10 @@ import {
     activitySignup,
     activityEmployeeAssignment,
 } from "./activity-schema";
+import {
+    serviceProviderCompany,
+    serviceProviderCompanyStaff,
+} from "./service-provider-schema";
 import { careTask } from "./care-task-schema";
 import {
     medicationDevice,
@@ -53,6 +57,8 @@ export const relations = defineRelations(
         activity,
         activitySignup,
         activityEmployeeAssignment,
+        serviceProviderCompany,
+        serviceProviderCompanyStaff,
         careTask,
         medicationDevice,
         citizenMedicationDevice,
@@ -128,6 +134,10 @@ export const relations = defineRelations(
             facilities: r.many.facillity({
                 from: r.organization.id,
                 to: r.facillity.organizationId,
+            }),
+            serviceProviderCompanies: r.many.serviceProviderCompany({
+                from: r.organization.id,
+                to: r.serviceProviderCompany.organizationId,
             }),
         },
         member: {
@@ -344,6 +354,10 @@ export const relations = defineRelations(
                 from: r.activity.locationAddressId,
                 to: r.address.id,
             }),
+            providerCompany: r.one.serviceProviderCompany({
+                from: r.activity.providerCompanyId,
+                to: r.serviceProviderCompany.id,
+            }),
             signups: r.many.activitySignup({
                 from: r.activity.id,
                 to: r.activitySignup.activityId,
@@ -351,6 +365,33 @@ export const relations = defineRelations(
             employeeAssignments: r.many.activityEmployeeAssignment({
                 from: r.activity.id,
                 to: r.activityEmployeeAssignment.activityId,
+            }),
+        },
+        serviceProviderCompany: {
+            organization: r.one.organization({
+                from: r.serviceProviderCompany.organizationId,
+                to: r.organization.id,
+                optional: false,
+            }),
+            staff: r.many.serviceProviderCompanyStaff({
+                from: r.serviceProviderCompany.id,
+                to: r.serviceProviderCompanyStaff.companyId,
+            }),
+            activities: r.many.activity({
+                from: r.serviceProviderCompany.id,
+                to: r.activity.providerCompanyId,
+            }),
+        },
+        serviceProviderCompanyStaff: {
+            user: r.one.user({
+                from: r.serviceProviderCompanyStaff.userId,
+                to: r.user.id,
+                optional: false,
+            }),
+            company: r.one.serviceProviderCompany({
+                from: r.serviceProviderCompanyStaff.companyId,
+                to: r.serviceProviderCompany.id,
+                optional: false,
             }),
         },
         activitySignup: {

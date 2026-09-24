@@ -124,6 +124,7 @@ export const invitation = pgTable(
             .notNull()
             .references(() => user.id, { onDelete: "cascade" }),
         facilityId: text("facility_id"),
+        serviceProviderCompanyId: text("service_provider_company_id"),
     },
     (table) => [
         index("invitation_organizationId_idx").on(table.organizationId),

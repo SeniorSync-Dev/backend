@@ -7,6 +7,7 @@ import {
     getInitialOrganizationAsync,
     getActiveOrganizationIdForUserAsync,
     linkCitizenToFacilityAsync,
+    linkServiceProviderCompanyStaffAsync,
 } from "./helpers/organizationHelper";
 import {
     ac,
@@ -74,6 +75,10 @@ export const auth = betterAuth({
                             type: "string",
                             required: false,
                         },
+                        serviceProviderCompanyId: {
+                            type: "string",
+                            required: false,
+                        },
                     },
                 },
             },
@@ -83,9 +88,20 @@ export const auth = betterAuth({
                         | string
                         | null
                         | undefined;
-                    if (invitation.role !== "citizen" || !facilityId) return;
+                    if (invitation.role === "citizen" && facilityId) {
+                        await linkCitizenToFacilityAsync(user.id, facilityId);
+                    }
 
-                    await linkCitizenToFacilityAsync(user.id, facilityId);
+                    const companyId = invitation.serviceProviderCompanyId as
+                        | string
+                        | null
+                        | undefined;
+                    if (invitation.role === "servicePartner" && companyId) {
+                        await linkServiceProviderCompanyStaffAsync(
+                            user.id,
+                            companyId,
+                        );
+                    }
                 },
             },
         }),

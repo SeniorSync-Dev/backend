@@ -4,6 +4,7 @@ interface ActivityModel {
     start: string;
     end?: string;
     location?: string;
+    providerCompanyName?: string;
     availableSpots?: number;
     isSignedUp: boolean;
 }

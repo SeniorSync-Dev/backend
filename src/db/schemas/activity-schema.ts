@@ -9,6 +9,7 @@ import {
 import { user } from "./auth-schema";
 import { citizen, employee } from "./subUser-schema";
 import { facillity, address } from "./facillity-schema";
+import { serviceProviderCompany } from "./service-provider-schema";
 
 export const activityTypeEnum = pgEnum("activity_type", [
     "outing",
@@ -49,6 +50,10 @@ export const activity = pgTable("activities", {
     createdByUserId: text("created_by_user_id")
         .notNull()
         .references(() => user.id),
+    // Set when a servicePartner creates the activity, null for staff-run activities
+    providerCompanyId: uuid("provider_company_id").references(
+        () => serviceProviderCompany.id,
+    ),
     title: text("title").notNull(),
     description: text("description"),
     type: activityTypeEnum("type").default("other").notNull(),

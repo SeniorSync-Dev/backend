@@ -8,6 +8,7 @@ import {
     citizenFacilities,
     employee,
     facillity,
+    serviceProviderCompany,
     user,
 } from "../../db/schemas";
 import {
@@ -276,6 +277,7 @@ async function visibleActivities(citizenUserId: string, activityId?: string) {
             capacity: activity.capacity,
             locationName: activity.locationName,
             facilityName: facillity.name,
+            providerCompanyName: serviceProviderCompany.name,
             registeredCount: sql<number>`(
                 select count(*) from ${activitySignup}
                 where ${activitySignup.activityId} = ${activity.id}
@@ -290,6 +292,10 @@ async function visibleActivities(citizenUserId: string, activityId?: string) {
         })
         .from(activity)
         .innerJoin(facillity, eq(activity.organizerFacilityId, facillity.id))
+        .leftJoin(
+            serviceProviderCompany,
+            eq(activity.providerCompanyId, serviceProviderCompany.id),
+        )
         .where(
             and(
                 inArray(activity.organizerFacilityId, linkedFacilities),
@@ -310,6 +316,7 @@ function toActivityDto(row: VisibleActivity): ActivityModel {
         start: row.start.toISOString(),
         end: row.end.toISOString(),
         location: row.locationName ?? row.facilityName,
+        providerCompanyName: row.providerCompanyName ?? undefined,
         availableSpots:
             row.capacity === null
                 ? undefined
