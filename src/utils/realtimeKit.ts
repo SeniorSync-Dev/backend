@@ -23,18 +23,22 @@ function config() {
     return { accountId, appId, apiToken };
 }
 
-async function requestAsync<T>(path: string, body: unknown): Promise<T> {
+async function requestAsync<T>(
+    path: string,
+    body?: unknown,
+    method: "POST" | "PATCH" = "POST",
+): Promise<T> {
     const { accountId, appId, apiToken } = config();
 
     const response = await fetch(
         `${API_BASE}/accounts/${accountId}/realtime/kit/${appId}${path}`,
         {
-            method: "POST",
+            method,
             headers: {
                 Authorization: `Bearer ${apiToken}`,
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify(body),
+            body: body === undefined ? undefined : JSON.stringify(body),
         },
     );
 
@@ -69,4 +73,9 @@ export async function addParticipantAsync(
     );
 
     return result.token;
+}
+
+export async function endMeetingAsync(meetingId: string) {
+    await requestAsync(`/meetings/${meetingId}/active-session/kick-all`);
+    await requestAsync(`/meetings/${meetingId}`, { status: "INACTIVE" }, "PATCH");
 }

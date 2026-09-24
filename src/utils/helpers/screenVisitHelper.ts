@@ -1,16 +1,12 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import { careTask, employee, relativeCitizen } from "../../db/schemas";
+import { endMeetingAsync } from "../realtimeKit";
 
 export type ScreenVisitRole = "citizen" | "employee" | "relative";
 
-// Man kan gå ind et kvarter før aftalt tid, så der er ro til at tjekke kamera
-// og mikrofon. Og en halv time efter sluttidspunktet, så en samtale der
-// afbrydes kan genoptages — uden det forsvinder knappen i samme sekund
-// besøget er slut.
 const OPENS_MINUTES_BEFORE = 15;
 const CLOSES_MINUTES_AFTER = 30;
-
 const MINUTE_MS = 60_000;
 
 export type JoinWindowState = "early" | "open" | "over";
@@ -98,12 +94,6 @@ export async function findJoinableScreenVisitAsync(
     return null;
 }
 
-// Når deltagelsesvinduet er lukket, er skærmbesøget forbi. Uden det her ville
-// det stå som "Planlagt" for evigt i personalets liste.
-//
-// meeting_id sættes først når den første deltager går ind, så den fortæller om
-// samtalen rent faktisk fandt sted. Var der ingen, er "udeblevet" sandheden —
-// ikke "gennemført".
 export async function settleEndedScreenVisitsAsync(now = new Date()) {
     const closed = screenVisitListCutoff(now).toISOString();
 
@@ -113,16 +103,30 @@ export async function settleEndedScreenVisitsAsync(now = new Date()) {
         sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart}) < ${closed}::timestamp`,
     );
 
-    await dbClient
+    const completed = await dbClient
         .update(careTask)
         .set({
             status: "completed",
             completedAt: sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart})`,
         })
-        .where(and(ended, isNotNull(careTask.meetingId)));
+        .where(and(ended, isNotNull(careTask.meetingId)))
+        .returning({ meetingId: careTask.meetingId });
 
     await dbClient
         .update(careTask)
         .set({ status: "missed" })
         .where(and(ended, isNull(careTask.meetingId)));
+
+    for (const visit of completed) {
+        if (!visit.meetingId) continue;
+
+        try {
+            await endMeetingAsync(visit.meetingId);
+        } catch (cause) {
+            console.error(
+                `Mødet ${visit.meetingId} kunne ikke lukkes:`,
+                cause,
+            );
+        }
+    }
 }
