@@ -40,6 +40,10 @@ export const auth = betterAuth({
     },
 
     user: {
+        changeEmail: {
+            enabled: true,
+            updateEmailWithoutVerification: true,
+        },
         additionalFields: {
             birthdate: {
                 type: "string",
