@@ -11,6 +11,7 @@ interface AppointmentModel {
     staffName?: string;
     createdByUserId?: string;
     isCompleted?: boolean;
+    canJoin?: boolean;
 }
 
 export type { AppointmentType, AppointmentModel };

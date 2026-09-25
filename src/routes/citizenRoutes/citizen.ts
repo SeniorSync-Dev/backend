@@ -24,9 +24,8 @@ import {
     toActivityDto,
     visibleActivitiesForCitizenAsync,
 } from "../../utils/helpers/citizenDataHelper";
-
-const UUID_PATTERN =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { settleEndedScreenVisitsAsync } from "../../utils/helpers/screenVisitHelper";
+import { isUuid } from "../../utils/uuid";
 
 const INVITE_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid confusion
 const INVITE_CODE_LENGTH = 6;
@@ -39,6 +38,9 @@ citizenRoutes.use("*", requireCitizen);
 
 citizenRoutes.get("/appointments", async (c) => {
     const citizenUserId = c.get("citizenUserId");
+
+    await settleEndedScreenVisitsAsync();
+
     const appointments = await getAppointmentsForCitizenAsync(citizenUserId, {
         from: startOfToday(),
         to: appointmentWindowEnd(),
@@ -115,7 +117,7 @@ citizenRoutes.post("/activities/:id/signup", async (c) => {
     const citizenUserId = c.get("citizenUserId");
     const activityId = c.req.param("id");
 
-    if (!UUID_PATTERN.test(activityId)) {
+    if (!isUuid(activityId)) {
         return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 
@@ -176,7 +178,7 @@ citizenRoutes.delete("/activities/:id/signup", async (c) => {
     const citizenUserId = c.get("citizenUserId");
     const activityId = c.req.param("id");
 
-    if (!UUID_PATTERN.test(activityId)) {
+    if (!isUuid(activityId)) {
         return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 

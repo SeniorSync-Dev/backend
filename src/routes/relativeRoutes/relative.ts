@@ -25,9 +25,7 @@ import {
     visibleActivitiesForCitizenAsync,
 } from "../../utils/helpers/citizenDataHelper";
 import { LinkedCitizenModel } from "../../models/relative";
-
-const UUID_PATTERN =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { isUuid } from "../../utils/uuid";
 
 const relativeRoutes = new Hono<{ Variables: RelativeVariables }>();
 
@@ -269,7 +267,7 @@ relativeRoutes.post("/citizens/:citizenId/activities/:activityId/signup", async 
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canBookActivities");
     if (!link) return c.json({ error: "Du har ikke adgang til at tilmelde denne borger." }, 403);
 
-    if (!UUID_PATTERN.test(activityId)) {
+    if (!isUuid(activityId)) {
         return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 
@@ -321,7 +319,7 @@ relativeRoutes.delete("/citizens/:citizenId/activities/:activityId/signup", asyn
     const link = await getApprovedRelativeLinkAsync(relativeUserId, citizenId, "canBookActivities");
     if (!link) return c.json({ error: "Du har ikke adgang til at afmelde denne borger." }, 403);
 
-    if (!UUID_PATTERN.test(activityId)) {
+    if (!isUuid(activityId)) {
         return c.json({ error: "Aktiviteten findes ikke." }, 404);
     }
 

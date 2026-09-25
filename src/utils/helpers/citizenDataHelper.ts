@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { dbClient } from "../../db/dbClient";
 import {
     activity,
@@ -11,6 +11,10 @@ import {
 } from "../../db/schemas";
 import { AppointmentModel } from "../../models/appointment";
 import { ActivityModel } from "../../models/activity";
+import {
+    joinWindowState,
+    screenVisitListCutoff,
+} from "./screenVisitHelper";
 
 export function startOfToday() {
     const date = new Date();
@@ -64,6 +68,14 @@ async function completePastVisitsAsync(citizenUserId: string) {
         );
 }
 
+// Tidspunkter gemmes som UTC i en timestamp-kolonne uden tidszone. Sammenligner
+// vi med et JS-Date inde i en rå sql-blok, kender Drizzle ikke typen, og
+// driveren sender lokal tid med offset — som Postgres kasserer. Det forskyder
+// sammenligningen med tidszonens offset, så grænsen bindes eksplicit som UTC.
+function endsAtOrAfter(cutoff: Date) {
+    return sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart}) >= ${cutoff.toISOString()}::timestamp`;
+}
+
 export async function getAppointmentsForCitizenAsync(
     citizenUserId: string,
     {
@@ -100,9 +112,14 @@ export async function getAppointmentsForCitizenAsync(
                         ? ["planned", "in_progress", "completed"]
                         : ["planned", "in_progress"],
                 ),
-                gte(
-                    sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart})`,
-                    from,
+                or(
+                    // Et skærmbesøg bliver stående så længe man stadig kan gå
+                    // ind igen, så knappen ikke forsvinder midt i samtalen.
+                    and(
+                        eq(careTask.type, "call"),
+                        endsAtOrAfter(screenVisitListCutoff(from)),
+                    ),
+                    and(ne(careTask.type, "call"), endsAtOrAfter(from)),
                 ),
                 to ? lte(careTask.scheduledStart, to) : undefined,
             ),
@@ -146,6 +163,10 @@ export async function getAppointmentsForCitizenAsync(
                 staffName: task.staffName ?? undefined,
                 createdByUserId: task.createdByUserId,
                 isCompleted: task.status === "completed",
+                canJoin:
+                    task.type === "call"
+                        ? joinWindowState(task.start, task.end) === "open"
+                        : undefined,
             }),
         ),
         ...signups.map(

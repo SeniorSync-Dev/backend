@@ -13,6 +13,10 @@ import {
 } from "../../db/schemas";
 import { auth } from "../../utils/auth";
 import { ensureEmployeeRecordAsync } from "../../utils/helpers/employeeHelper";
+import {
+    joinWindowState,
+    settleEndedScreenVisitsAsync,
+} from "../../utils/helpers/screenVisitHelper";
 
 const visitRoutes = new Hono();
 
@@ -35,9 +39,12 @@ visitRoutes.get("/", async (c) => {
     const facilityIds = await getOrganizationFacilityIds(organizationId);
     if (facilityIds.length === 0) return c.json([]);
 
+    await settleEndedScreenVisitsAsync();
+
     const visits = await dbClient
         .select({
             id: careTask.id,
+            type: careTask.type,
             title: careTask.title,
             description: careTask.description,
             scheduledStart: careTask.scheduledStart,
@@ -55,13 +62,27 @@ visitRoutes.get("/", async (c) => {
         .leftJoin(employeeUser, eq(employee.userId, employeeUser.id))
         .where(
             and(
-                eq(careTask.type, "visit"),
+                inArray(careTask.type, ["visit", "call"]),
                 inArray(careTask.facilityId, facilityIds),
             ),
         )
         .orderBy(asc(careTask.scheduledStart));
 
-    return c.json(visits);
+    const now = new Date();
+
+    return c.json(
+        visits.map((visit) => ({
+            ...visit,
+            canJoin:
+                visit.type === "call"
+                    ? joinWindowState(
+                          visit.scheduledStart,
+                          visit.scheduledEnd,
+                          now,
+                      ) === "open"
+                    : undefined,
+        })),
+    );
 });
 
 visitRoutes.get("/options", async (c) => {
@@ -123,7 +144,12 @@ visitRoutes.post("/", async (c) => {
         description,
         scheduledStart,
         scheduledEnd,
+        type,
     } = body;
+
+    // Kun fysiske besøg og skærmbesøg planlægges herfra. De øvrige care
+    // task-typer (medicin, hygiejne, …) hører til andre arbejdsgange.
+    const taskType = type === "call" ? "call" : "visit";
     if (!citizenUserId || !scheduledStart) {
         return c.json(
             { message: "citizenUserId og scheduledStart er påkrævet" },
@@ -174,8 +200,8 @@ visitRoutes.post("/", async (c) => {
             citizenUserId,
             assignedEmployeeId: assignedEmployeeId || null,
             facilityId: citizenLink.facilityId,
-            type: "visit",
-            title: title || "Besøg",
+            type: taskType,
+            title: title || (taskType === "call" ? "Skærmbesøg" : "Besøg"),
             description: description || null,
             scheduledStart: new Date(scheduledStart),
             scheduledEnd: scheduledEnd ? new Date(scheduledEnd) : null,
@@ -224,7 +250,7 @@ visitRoutes.post("/:id/assign", async (c) => {
         .where(
             and(
                 eq(careTask.id, visitId),
-                eq(careTask.type, "visit"),
+                inArray(careTask.type, ["visit", "call"]),
                 inArray(careTask.facilityId, facilityIds),
                 isNull(careTask.assignedEmployeeId),
             ),

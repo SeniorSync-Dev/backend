@@ -1,0 +1,1 @@
+ALTER TABLE "care_tasks" ADD COLUMN "meeting_id" text;

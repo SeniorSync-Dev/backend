@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import { getConnInfo } from "hono/bun";
-import dbClient from "../db/dbClient";
 import { auditLog } from "../db/schemas/audit-schema";
+import { dbClient } from "../db/dbClient";
 
 export type AuditEntry = {
   actorId: string | null;

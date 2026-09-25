@@ -8,6 +8,7 @@ import visitRoutes from "./routes/adminRoutes/visitRoutes";
 import citizenRoutes from "./routes/citizenRoutes/citizen";
 import relativeRoutes from "./routes/relativeRoutes/relative";
 import sensorEventRoutes from "./routes/adminRoutes/sensorEventRoutes";
+import screenVisitRoutes from "./routes/screenVisitRoutes/screenVisit";
 
 const app = new Hono();
 
@@ -37,6 +38,7 @@ app.route("/sensor-events", sensorEventRoutes);
 app.route("/api/visits", visitRoutes);
 app.route("/citizen", citizenRoutes);
 app.route("/relative", relativeRoutes);
+app.route("/screen-visits", screenVisitRoutes);
 
 app.get("/", (c) => c.text("Hello Hono!"));
 
