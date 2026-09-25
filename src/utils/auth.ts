@@ -40,6 +40,10 @@ export const auth = betterAuth({
     },
 
     user: {
+        changeEmail: {
+            enabled: true,
+            updateEmailWithoutVerification: true,
+        },
         additionalFields: {
             birthdate: {
                 type: "string",
@@ -103,6 +107,7 @@ export const auth = betterAuth({
                         "nin",
                         "mitid-extra",
                     ],
+                    postLogoutRedirectURI: "http://localhost:3001/",
                     mapProfileToUser: (profile) => {
                         const nin = (profile.nin as string | undefined) ?? null;
 
