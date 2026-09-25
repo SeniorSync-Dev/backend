@@ -1,0 +1,1 @@
+ALTER TABLE "sensor_events" ADD CONSTRAINT "sensor_events_device_type_occurred_at_unique" UNIQUE("device_id","event_type","occurred_at");

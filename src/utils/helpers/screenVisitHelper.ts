@@ -84,6 +84,7 @@ export async function findJoinableScreenVisitAsync(
             and(
                 eq(relativeCitizen.relativeUserId, userId),
                 eq(relativeCitizen.citizenUserId, task.citizenUserId),
+                eq(relativeCitizen.status, "approved"),
                 eq(relativeCitizen.canView, true),
             ),
         )
