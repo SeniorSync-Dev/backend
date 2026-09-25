@@ -24,6 +24,12 @@ export const employmentStatusEnum = pgEnum("employment_status", [
     "on_leave",
 ]);
 
+export const relativeLinkStatusEnum = pgEnum("relative_link_status", [
+    "pending",
+    "approved",
+    "rejected",
+]);
+
 export const relative = pgTable("relative", {
     userId: text("userId")
         .primaryKey()
@@ -86,7 +92,8 @@ export const relativeCitizen = pgTable(
             .references(() => citizen.userId, { onDelete: "cascade" }),
         // e.g. daughter, son, spouse, guardian
         relationshipType: text("relationship_type").notNull(),
-        canView: boolean("can_view").default(true).notNull(),
+        status: relativeLinkStatusEnum("status").default("pending").notNull(),
+        canView: boolean("can_view").default(false).notNull(),
         canBookActivities: boolean("can_book_activities")
             .default(false)
             .notNull(),
@@ -103,3 +110,13 @@ export const relativeCitizen = pgTable(
         primaryKey({ columns: [table.relativeUserId, table.citizenUserId] }),
     ],
 );
+
+export const citizenInviteCode = pgTable("citizen_invite_code", {
+    id: uuid("id").primaryKey().defaultRandom(),
+    citizenUserId: text("citizen_user_id")
+        .notNull()
+        .references(() => citizen.userId, { onDelete: "cascade" }),
+    code: text("code").notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+});

@@ -1,0 +1,236 @@
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { dbClient } from "../../db/dbClient";
+import {
+    activity,
+    activitySignup,
+    careTask,
+    citizenFacilities,
+    employee,
+    facillity,
+    user,
+} from "../../db/schemas";
+import { AppointmentModel } from "../../models/appointment";
+import { ActivityModel } from "../../models/activity";
+
+export function startOfToday() {
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    return date;
+}
+
+export const APPOINTMENT_WINDOW_DAYS = 14;
+
+async function getHomeFacilityNameAsync(citizenUserId: string) {
+    const [row] = await dbClient
+        .select({ name: facillity.name })
+        .from(citizenFacilities)
+        .innerJoin(facillity, eq(citizenFacilities.facilityId, facillity.id))
+        .where(
+            and(
+                eq(citizenFacilities.citizenUserId, citizenUserId),
+                or(
+                    isNull(citizenFacilities.endDate),
+                    gte(citizenFacilities.endDate, sql`current_date`),
+                ),
+            ),
+        )
+        .orderBy(desc(citizenFacilities.isPrimary))
+        .limit(1);
+
+    return row?.name;
+}
+
+export function appointmentWindowEnd() {
+    const date = new Date();
+    date.setDate(date.getDate() + APPOINTMENT_WINDOW_DAYS);
+    date.setHours(23, 59, 59, 999);
+    return date;
+}
+
+async function completePastVisitsAsync(citizenUserId: string) {
+    await dbClient
+        .update(careTask)
+        .set({
+            status: "completed",
+            completedAt: sql`${careTask.scheduledEnd}`,
+        })
+        .where(
+            and(
+                eq(careTask.citizenUserId, citizenUserId),
+                eq(careTask.type, "visit"),
+                inArray(careTask.status, ["planned", "in_progress"]),
+                lt(careTask.scheduledEnd, new Date()),
+            ),
+        );
+}
+
+export async function getAppointmentsForCitizenAsync(
+    citizenUserId: string,
+    {
+        from = new Date(),
+        to,
+        includeCompleted = false,
+    }: { from?: Date; to?: Date; includeCompleted?: boolean } = {},
+) {
+    await completePastVisitsAsync(citizenUserId);
+
+    const tasks = await dbClient
+        .select({
+            id: careTask.id,
+            type: careTask.type,
+            title: careTask.title,
+            description: careTask.description,
+            start: careTask.scheduledStart,
+            end: careTask.scheduledEnd,
+            facilityName: facillity.name,
+            staffName: user.name,
+            createdByUserId: careTask.createdByUserId,
+            status: careTask.status,
+        })
+        .from(careTask)
+        .leftJoin(facillity, eq(careTask.facilityId, facillity.id))
+        .leftJoin(employee, eq(careTask.assignedEmployeeId, employee.id))
+        .leftJoin(user, eq(employee.userId, user.id))
+        .where(
+            and(
+                eq(careTask.citizenUserId, citizenUserId),
+                inArray(
+                    careTask.status,
+                    includeCompleted
+                        ? ["planned", "in_progress", "completed"]
+                        : ["planned", "in_progress"],
+                ),
+                gte(
+                    sql`coalesce(${careTask.scheduledEnd}, ${careTask.scheduledStart})`,
+                    from,
+                ),
+                to ? lte(careTask.scheduledStart, to) : undefined,
+            ),
+        )
+        .orderBy(asc(careTask.scheduledStart));
+
+    const signups = await dbClient
+        .select({
+            id: activity.id,
+            title: activity.title,
+            start: activity.startsAt,
+            end: activity.endsAt,
+            locationName: activity.locationName,
+            facilityName: facillity.name,
+        })
+        .from(activitySignup)
+        .innerJoin(activity, eq(activitySignup.activityId, activity.id))
+        .innerJoin(facillity, eq(activity.organizerFacilityId, facillity.id))
+        .where(
+            and(
+                eq(activitySignup.citizenUserId, citizenUserId),
+                eq(activitySignup.status, "registered"),
+                eq(activity.status, "published"),
+                gte(activity.endsAt, from),
+                to ? lte(activity.startsAt, to) : undefined,
+            ),
+        );
+
+    const homeFacilityName = await getHomeFacilityNameAsync(citizenUserId);
+
+    const appointments: AppointmentModel[] = [
+        ...tasks.map(
+            (task): AppointmentModel => ({
+                id: task.id,
+                type: task.type === "call" ? "screen_visit" : "home_visit",
+                title: task.title,
+                description: task.description ?? undefined,
+                start: task.start.toISOString(),
+                end: task.end?.toISOString(),
+                location: task.facilityName ?? homeFacilityName,
+                staffName: task.staffName ?? undefined,
+                createdByUserId: task.createdByUserId,
+                isCompleted: task.status === "completed",
+            }),
+        ),
+        ...signups.map(
+            (signup): AppointmentModel => ({
+                id: signup.id,
+                type: "activity",
+                title: signup.title,
+                start: signup.start.toISOString(),
+                end: signup.end.toISOString(),
+                location: signup.locationName ?? signup.facilityName,
+            }),
+        ),
+    ].sort((a, b) => a.start.localeCompare(b.start));
+
+    return appointments;
+}
+
+export async function visibleActivitiesForCitizenAsync(
+    citizenUserId: string,
+    activityId?: string,
+) {
+    const linkedFacilities = dbClient
+        .select({ facilityId: citizenFacilities.facilityId })
+        .from(citizenFacilities)
+        .where(
+            and(
+                eq(citizenFacilities.citizenUserId, citizenUserId),
+                or(
+                    isNull(citizenFacilities.endDate),
+                    gte(citizenFacilities.endDate, sql`current_date`),
+                ),
+            ),
+        );
+
+    return dbClient
+        .select({
+            id: activity.id,
+            title: activity.title,
+            description: activity.description,
+            start: activity.startsAt,
+            end: activity.endsAt,
+            capacity: activity.capacity,
+            locationName: activity.locationName,
+            facilityName: facillity.name,
+            registeredCount: sql<number>`(
+                select count(*) from ${activitySignup}
+                where ${activitySignup.activityId} = ${activity.id}
+                  and ${activitySignup.status} = 'registered'
+            )`.mapWith(Number),
+            isSignedUp: sql<boolean>`exists (
+                select 1 from ${activitySignup}
+                where ${activitySignup.activityId} = ${activity.id}
+                  and ${activitySignup.citizenUserId} = ${citizenUserId}
+                  and ${activitySignup.status} = 'registered'
+            )`,
+        })
+        .from(activity)
+        .innerJoin(facillity, eq(activity.organizerFacilityId, facillity.id))
+        .where(
+            and(
+                inArray(activity.organizerFacilityId, linkedFacilities),
+                eq(activity.status, "published"),
+                gte(activity.endsAt, new Date()),
+                activityId ? eq(activity.id, activityId) : undefined,
+            ),
+        )
+        .orderBy(asc(activity.startsAt));
+}
+
+type VisibleActivity = Awaited<
+    ReturnType<typeof visibleActivitiesForCitizenAsync>
+>[number];
+
+export function toActivityDto(row: VisibleActivity): ActivityModel {
+    return {
+        id: row.id,
+        title: row.title,
+        description: row.description ?? undefined,
+        start: row.start.toISOString(),
+        end: row.end.toISOString(),
+        location: row.locationName ?? row.facilityName,
+        availableSpots:
+            row.capacity === null
+                ? undefined
+                : Math.max(0, row.capacity - row.registeredCount),
+        isSignedUp: row.isSignedUp,
+    };
+}
