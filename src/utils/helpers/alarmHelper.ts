@@ -16,7 +16,14 @@ export async function handleFallSensorStatusChangeAsync(statusChange: StatusChan
         fall_detected: handleFallStatusAsync,
     };
 
-    await handlers[statusChange.event](statusChange);
+    const handler = (handlers as Record<string, (change: StatusChange) => Promise<void>>)[statusChange.event];
+
+    if (!handler) {
+        console.warn(`Received unknown fall-sensor event "${statusChange.event}" for device ${statusChange.deviceId}. Ignoring.`);
+        return;
+    }
+
+    await handler(statusChange);
 }
 
 async function handleOnlineStatusAsync(statusChange: StatusChange): Promise<void> {
