@@ -15,7 +15,7 @@ const app = new Hono();
 app.use(
     "*",
     cors({
-        origin: ["http://localhost:3001", "http://localhost:3000"],
+        origin: [process.env.BETTER_AUTH_URL!, process.env.FRONTEND_URL!],
         allowHeaders: ["Content-Type", "Authorization"],
         allowMethods: ["POST", "GET", "OPTIONS", "PUT", "PATCH", "DELETE"],
         exposeHeaders: ["Content-Length"],
