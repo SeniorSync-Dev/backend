@@ -11,6 +11,11 @@ const requiredSecrets = [
     "MQTT_BROKER_URL",
     "MQTT_USERNAME",
     "MQTT_PASSWORD",
+    "POST_LOGOUT_REDIRECT_URL",
+    "FRONTEND_URL",
+    "CLOUDFLARE_ACCOUNT_ID",
+    "CLOUDFLARE_API_TOKEN",
+    "CLOUDFLARE_REALTIME_APP_ID"
 ] as const;
 
 export async function loadDopplerSecrets(): Promise<void> {

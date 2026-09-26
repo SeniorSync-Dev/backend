@@ -107,7 +107,7 @@ export const auth = betterAuth({
                         "nin",
                         "mitid-extra",
                     ],
-                    postLogoutRedirectURI: "http://localhost:3001/",
+                    postLogoutRedirectURI: process.env.POST_LOGOUT_REDIRECT_URL!,
                     mapProfileToUser: (profile) => {
                         const nin = (profile.nin as string | undefined) ?? null;
 
@@ -165,5 +165,5 @@ export const auth = betterAuth({
         },
     },
 
-    trustedOrigins: ["http://localhost:3000", "http://localhost:3001"],
+    trustedOrigins: [process.env.BETTER_AUTH_URL!, process.env.FRONTEND_URL!],
 });
